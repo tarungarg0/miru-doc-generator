@@ -106,8 +106,8 @@ if template_file or default_wb:
         for i, term in enumerate(terms):
             row = term_start_row + i
             ws.merge_cells(f"A{row}:E{row}")
-            clean_term = term.replace("
-", " "), " ").strip()
+            clean_term = term.replace("\\n", " ").strip()
+
             ws[f"A{row}"] = f"{i+1}. {clean_term}"
             ws[f"A{row}"].alignment = Alignment(wrap_text=False, vertical="top")
 

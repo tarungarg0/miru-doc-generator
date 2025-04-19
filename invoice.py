@@ -172,6 +172,7 @@ if template_file or default_wb:
         html_filled = html_filled.replace("{{payment_terms}}", terms[2] if len(terms) > 2 else "")
 
         st.components.v1.html(html_filled, height=1000, scrolling=True)
+        summary_labels = ["Subtotal", "CGST @ 9%", "SGST @ 9%", "Transport", "Total"]
         for i, (label, value) in enumerate(zip(summary_labels, summary_values)):
             row = start_row + len(items) + 1 + i
             ws[f"H{row}"] = label

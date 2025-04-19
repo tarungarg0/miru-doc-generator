@@ -87,7 +87,28 @@ if template_file or default_wb:
 
     # Change this cell to match your template's header area
 
-    if st.button("Generate Invoice"):
+    if st.button("Generate Document"):
+        # Optional: Preview HTML version
+        html_preview = f"""
+        <div style='font-family: Bebas Neue Pro Expanded, sans-serif; padding: 20px;'>
+            <h2 style='text-align: center;'>MIRU {doc_type}</h2>
+            <hr>
+            <p><strong>Client Name:</strong> {client_name}</p>
+            <p><strong>Billing Address:</strong><br>{billing_address.replace('
+', '<br>')}</p>
+            <p><strong>Delivery Address:</strong><br>{delivery_address.replace('
+', '<br>')}</p>
+            <p><strong>Date:</strong> {invoice_date.strftime('%d-%m-%Y')}</p>
+            <h4>Line Items:</h4>
+            <table style='width:100%; border-collapse: collapse;'>
+                <tr><th style='border: 1px solid #000;'>HSN</th><th style='border: 1px solid #000;'>Description</th><th style='border: 1px solid #000;'>Qty</th><th style='border: 1px solid #000;'>Unit</th><th style='border: 1px solid #000;'>Rate</th><th style='border: 1px solid #000;'>Amount</th></tr>
+                {''.join(f"<tr><td style='border:1px solid #ccc'>{item['hsn']}</td><td style='border:1px solid #ccc'>{item['desc']}</td><td style='border:1px solid #ccc'>{item['qty']}</td><td style='border:1px solid #ccc'>{item['unit']}</td><td style='border:1px solid #ccc'>{item['rate']}</td><td style='border:1px solid #ccc'>₹{item['qty'] * item['rate']:,.2f}</td></tr>" for item in items)}
+            </table>
+            <br><h4>Terms & Conditions:</h4>
+            {''.join(f"<p>{i+1}. {term}</p>" for i, term in enumerate(terms))}
+        </div>
+        """
+        st.components.v1.html(html_preview, height=700, scrolling=True)
         thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
         font_table = Font(name="Bebas Neue Pro Expanded", color="595959")
 
@@ -106,8 +127,8 @@ if template_file or default_wb:
         for i, term in enumerate(terms):
             row = term_start_row + i
             ws.merge_cells(f"A{row}:E{row}")
-            clean_term = term.replace("\\n", " ").strip()
-
+            clean_term = term.replace("
+", " ").strip()
             ws[f"A{row}"] = f"{i+1}. {clean_term}"
             ws[f"A{row}"].alignment = Alignment(wrap_text=False, vertical="top")
 
@@ -154,6 +175,13 @@ if template_file or default_wb:
         output = BytesIO()
         wb.save(output)
         output.seek(0)
+
+        # Save to a temporary Excel file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_excel:
+            tmp_excel.write(output.read())
+            tmp_excel_path = tmp_excel.name
+
+        
 
         doc_type_prefix = doc_type.replace(" ", "_").lower()
         filename = f"{doc_type_prefix}_{client_name.replace(' ', '_')}.xlsx"

@@ -94,10 +94,10 @@ if template_file or default_wb:
             <h2 style='text-align: center;'>MIRU {doc_type}</h2>
             <hr>
             <p><strong>Client Name:</strong> {client_name}</p>
-            <p><strong>Billing Address:</strong><br>{billing_address.replace('
-', '<br>')}</p>
-            <p><strong>Delivery Address:</strong><br>{delivery_address.replace('
-', '<br>')}</p>
+            <p><strong>Billing Address:</strong><br>{billing_address.replace("
+", "<br>")}</p>
+            <p><strong>Delivery Address:</strong><br>{delivery_address.replace("
+", "<br>")}</p>
             <p><strong>Date:</strong> {invoice_date.strftime('%d-%m-%Y')}</p>
             <h4>Line Items:</h4>
             <table style='width:100%; border-collapse: collapse;'>

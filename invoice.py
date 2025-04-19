@@ -102,6 +102,15 @@ if template_file or default_wb:
                 <tr><th style='border: 1px solid #000;'>HSN</th><th style='border: 1px solid #000;'>Description</th><th style='border: 1px solid #000;'>Qty</th><th style='border: 1px solid #000;'>Unit</th><th style='border: 1px solid #000;'>Rate</th><th style='border: 1px solid #000;'>Amount</th></tr>
                 {''.join(f"<tr><td style='border:1px solid #ccc'>{item['hsn']}</td><td style='border:1px solid #ccc'>{item['desc']}</td><td style='border:1px solid #ccc'>{item['qty']}</td><td style='border:1px solid #ccc'>{item['unit']}</td><td style='border:1px solid #ccc'>{item['rate']}</td><td style='border:1px solid #ccc'>₹{item['qty'] * item['rate']:,.2f}</td></tr>" for item in items)}
             </table>
+            <br><h4>Summary:</h4>
+            <table style='width:50%; border-collapse: collapse; float: right;'>
+                <tr><td style='border:1px solid #ccc'>Subtotal</td><td style='border:1px solid #ccc; text-align:right;'>₹{total:,.2f}</td></tr>
+                <tr><td style='border:1px solid #ccc'>CGST @9%</td><td style='border:1px solid #ccc; text-align:right;'>₹{total*0.09:,.2f}</td></tr>
+                <tr><td style='border:1px solid #ccc'>SGST @9%</td><td style='border:1px solid #ccc; text-align:right;'>₹{total*0.09:,.2f}</td></tr>
+                <tr><td style='border:1px solid #ccc'>Transport</td><td style='border:1px solid #ccc; text-align:right;'>{transport_included}</td></tr>
+                <tr><td style='border:1px solid #ccc'><strong>Total</strong></td><td style='border:1px solid #ccc; text-align:right;'><strong>₹{grand_total:,.2f}</strong></td></tr>
+            </table>
+
             <br><h4>Terms & Conditions:</h4>
             {''.join(f"<p>{i+1}. {term}</p>" for i, term in enumerate(terms))}
         </div>

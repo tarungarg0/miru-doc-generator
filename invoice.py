@@ -144,12 +144,13 @@ if template_file or default_wb:
         grand_total = round(total * 1.18)
         summary_values = [f"₹{total:,.2f}", f"₹{total*0.09:,.2f}", f"₹{total*0.09:,.2f}", transport_included, f"₹{grand_total:,}"]
 
-        html_template = open("pdf.html", "r").read()
+        html_path = os.path.join(os.path.dirname(__file__), "pdf.html")
+        html_template = open(html_path, "r").read() if os.path.exists(html_path) else "<p><strong>HTML template missing.</strong></p>"
         html_filled = html_template
         html_filled = html_filled.replace("{{document_type}}", doc_type)
         html_filled = html_filled.replace("{{recipient_name}}", client_name)
-        html_filled = html_filled.replace("{{delivery_address}}", delivery_address.replace("\n", "<br>"))
-
+        html_filled = html_filled.replace("{{delivery_address}}", delivery_address.replace("
+", "<br>"))))
         html_filled = html_filled.replace("{{invoice_date}}", invoice_date.strftime('%d-%m-%Y'))
 
         if items:

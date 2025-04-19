@@ -149,8 +149,7 @@ if template_file or default_wb:
         html_filled = html_template
         html_filled = html_filled.replace("{{document_type}}", doc_type)
         html_filled = html_filled.replace("{{recipient_name}}", client_name)
-        html_filled = html_filled.replace("{{delivery_address}}", delivery_address.replace("
-", "<br>"))
+        html_filled = html_filled.replace("{{delivery_address}}", delivery_address.replace("\n", "<br>"))
         html_filled = html_filled.replace("{{invoice_date}}", invoice_date.strftime('%d-%m-%Y'))
 
         if items:

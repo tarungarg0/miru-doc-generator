@@ -62,6 +62,12 @@ if template_file or default_wb:
     delivery_address = st.text_area("Delivery Address", value=delivery_address_q)
     invoice_date = st.date_input("Invoice Date", value=datetime.today())
 
+    st.markdown("## 📄 Terms & Conditions")
+    term_count = st.number_input("Number of terms", min_value=1, max_value=10, value=1)
+    terms = []
+    for i in range(term_count):
+        terms.append(st.text_area(f"Term {i+1}", key=f"term_{i}"))
+
     st.markdown("## 📦 Line Items")
     item_count = st.number_input("Number of line items", min_value=1, value=1)
     transport_included = st.radio("Transport Charges", ["Included", "Extra"], index=0)
@@ -95,6 +101,16 @@ if template_file or default_wb:
 
         
         start_row = 23
+        # Insert terms into sheet
+        term_start_row = 34
+        for i, term in enumerate(terms):
+            row = term_start_row + i
+            ws.merge_cells(f"A{row}:E{row}")
+            clean_term = term.replace("
+", " ").strip()
+            ws[f"A{row}"] = f"{i+1}. {clean_term}"
+            ws[f"A{row}"].alignment = Alignment(wrap_text=False, vertical="top")
+
         # Add borders to header rows
         for row in [21, 22]:
             for col in ["A", "B", "C", "D", "E", "F", "G", "H", "I"]:

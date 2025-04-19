@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pdfmonkey</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .company-logo {
+            width: 150px;
+            height: auto;
+        }
+        .company-details {
+            text-align: right;
+        }
+        .company-details p {
+            margin: 0;
+        }
+        .document-type {
+            text-align: right;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+        }
+        .section-title {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .section-content {
+            margin-bottom: 20px;
+        }
+        .recipient-date {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        .total-section {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        .total-table {
+            width: 50%;
+            border-collapse: collapse;
+        }
+        .total-table th, .total-table td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: right;
+        }
+        .terms, .billing-details {
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <img src="{{company_logoURL}}" alt="Company Logo" class="company-logo">
+            </div>
+            <div class="company-details">
+                <p><strong>{{company_name}}</strong></p>
+                <p>GST: {{company_gst}}</p>
+                <p>Phone: {{company_phone}}</p>
+            </div>
+        </div>
+
+    
+        <div class="document-type">
+            <strong>{{document_type}}</strong> 
+        </div>
+
+        <div class="recipient-date">
+            <div>
+                <div class="section-title">Recipient</div>
+                <div class="section-content">{{recipient_name}}</div>
+            </div>
+            <div style="text-align: right;">
+                <div class="section-title">Date</div>
+                <div class="section-content">{{invoice_date}}</div>
+            </div>
+        </div>
+
+        <div class="delivery-info">
+            <div class="section-title">Delivery Address</div>
+            <div class="section-content">{{delivery_address}}</div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>HSN</th>
+                    <th>Description</th>
+                    <th>QTY</th>
+                    <th>Unit</th>
+                    <th>Rate/sqft</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>{{item_hsn}}</td>
+                    <td>{{item_description}}</td>
+                    <td>{{item_qty}}</td>
+                    <td>{{item_unit}}</td>
+                    <td>{{item_rate}}</td>
+                    <td>{{item_amount}}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="total-section">
+            <table class="total-table">
+                <tr>
+                    <th>Subtotal:</th>
+                    <td>₹{{subtotal}}</td>
+                </tr>
+                <tr>
+                    <th>CGST:</th>
+                    <td>₹{{cgst}}</td>
+                </tr>
+                <tr>
+                    <th>SGST:</th>
+                    <td>₹{{sgst}}</td>
+                </tr>
+                <tr>
+                    <th>Transportation:</th>
+                    <td>{{transportation}}</td>
+                </tr>
+                <tr>
+                    <th><strong>Total (Round off):</strong></th>
+                    <td><strong>₹{{total_amount}}</strong></td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="billing-details">
+            <div class="section-title">Billing Details</div>
+            <div class="section-content">
+                <p>Account Holder: {{bank_account_holder}}</p>
+                <p>Account Number: {{bank_account_number}}</p>
+                <p>IFSC: {{bank_ifsc}}</p>
+                <p>Branch: {{bank_branch}}</p>
+            </div>
+        </div>
+
+        <div class="terms">
+            <div class="section-title">Terms</div>
+            <div class="section-content">
+                <p>1. {{term_1}}</p>
+                <p>2. {{term_2}}</p>
+                <p>3. Payment Terms: {{payment_terms}}</p>
+                <p>4. Actual billing will be done as per the number of pieces supplied.</p>
+                <p>5. Labour accommodation shall be provided.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

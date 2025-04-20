@@ -73,7 +73,7 @@ if st.button("Generate PDF"):
 
     logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:80px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
 
-    html_template = f"""
+    html_template = """
     <!DOCTYPE html>
     <html lang=\"en\">
     <head>
@@ -81,23 +81,23 @@ if st.button("Generate PDF"):
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
         <title>Invoice</title>
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }}
-            .container {{ max-width: 800px; margin: 0 auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }}
-            .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
-            .company-logo {{ width: 150px; height: auto; }}
-            .company-details {{ text-align: right; }}
-            .company-details p {{ margin: 0; }}
-            .document-type {{ text-align: right; font-size: 1.2em; margin-bottom: 20px; }}
-            .section-title {{ margin-bottom: 5px; font-weight: bold; }}
-            .section-content {{ margin-bottom: 20px; }}
-            .recipient-date {{ display: flex; justify-content: space-between; margin-bottom: 20px; }}
-            table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
-            table, th, td {{ border: 1px solid #ccc; }}
-            th, td {{ padding: 10px; text-align: left; }}
-            .total-section {{ display: flex; justify-content: flex-end; margin-top: 20px; }}
-            .total-table {{ width: 50%; border-collapse: collapse; }}
-            .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; }}
-            .terms, .billing-details {{ font-size: 0.9em; }}
+            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
+            .container { max-width: 800px; margin: 0 auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+            .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+            .company-logo { width: 150px; height: auto; }
+            .company-details { text-align: right; }
+            .company-details p { margin: 0; }
+            .document-type { text-align: right; font-size: 1.2em; margin-bottom: 20px; }
+            .section-title { margin-bottom: 5px; font-weight: bold; }
+            .section-content { margin-bottom: 20px; }
+            .recipient-date { display: flex; justify-content: space-between; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            table, th, td { border: 1px solid #ccc; }
+            th, td { padding: 10px; text-align: left; }
+            .total-section { display: flex; justify-content: flex-end; margin-top: 20px; }
+            .total-table { width: 50%; border-collapse: collapse; }
+            .total-table th, .total-table td { border: 1px solid #ccc; padding: 10px; text-align: right; }
+            .terms, .billing-details { font-size: 0.9em; }
         </style>
     </head>
     <body>
@@ -120,13 +120,13 @@ if st.button("Generate PDF"):
                 </div>
                 <div style=\"text-align: right;\">
                     <div class=\"section-title\">Date</div>
-                    <div class=\"section-content\">{invoice_date.strftime('%d-%m-%Y')}</div>
+                    <div class=\"section-content\">{invoice_date}</div>
                 </div>
             </div>
 
             <div class=\"delivery-info\">
                 <div class=\"section-title\">Delivery Address</div>
-                <div class=\"section-content\">{delivery_address.replace('\\n', '<br>')}</div>
+                <div class=\"section-content\">{delivery_address}</div>
             </div>
 
             <table>

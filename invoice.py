@@ -17,12 +17,12 @@ logo_base64 = get_base64_image(logo_path) if os.path.exists(logo_path) else None
 st.markdown("""
     <h2 style='text-align: center; font-family: Bebas Neue Pro Expanded;'>MIRU Document Generator</h2>
     <hr style='margin-top: 0;'>
-    <style>
+    <style>{{
         label, .stTextInput>div>div>input, .stTextArea textarea, .stNumberInput input {
             font-size: 16px;
             font-family: 'Bebas Neue Pro Expanded', sans-serif;
             color: #2E2E2E;
-        }
+      }} }
         .stRadio label {
             font-size: 16px;
             font-family: 'Bebas Neue Pro Expanded', sans-serif;
@@ -33,7 +33,7 @@ st.markdown("""
             font-family: 'Bebas Neue Pro Expanded', sans-serif;
             letter-spacing: 1px;
         }
-    </style>
+    }}</style>
 """, unsafe_allow_html=True)
 
 query_params = st.query_params
@@ -85,7 +85,7 @@ if st.button("Generate PDF"):
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
         <title>Invoice</title>
         <style>
-            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
+            body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
             .container { max-width: 800px; margin: 0 auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
             .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
             .company-logo { width: 150px; height: auto; }

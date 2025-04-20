@@ -75,11 +75,68 @@ if st.button("Generate Document"):
     total = sum(item["qty"] * item["rate"] for item in items)
     grand_total = round(total * 1.18)
 
-    html_path = os.path.join(os.path.dirname(__file__), "pdf.html")
-    if not os.path.exists(html_path):
-        st.error("pdf.html template not found.")
-    else:
-        html_template = open(html_path, "r").read()
+    html_template = """
+    <!DOCTYPE html>
+    <html lang=\"en\">
+    <head>
+        <meta charset=\"UTF-8\">
+        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+        <title>Invoice</title>
+        <style>
+            body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
+            .container { background: white; padding: 20px; border-radius: 8px; max-width: 800px; margin: auto; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .total-section { margin-top: 20px; float: right; width: 50%; }
+            .terms { font-size: 0.9em; margin-top: 30px; }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div style='text-align:center;'>{{logo}}</div>
+            <h2 style='text-align:center;'>{{document_type}}</h2>
+            <p><strong>To:</strong> {{recipient_name}}</p>
+            <p><strong>Delivery Address:</strong><br>{{delivery_address}}</p>
+            <p><strong>Date:</strong> {{invoice_date}}</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>HSN</th>
+                        <th>Description</th>
+                        <th>QTY</th>
+                        <th>Unit</th>
+                        <th>Rate</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{item_rows}}
+                </tbody>
+            </table>
+
+            <div class='total-section'>
+                <table>
+                    <tr><th>Subtotal</th><td>₹{{subtotal}}</td></tr>
+                    <tr><th>CGST</th><td>₹{{cgst}}</td></tr>
+                    <tr><th>SGST</th><td>₹{{sgst}}</td></tr>
+                    <tr><th>Transportation</th><td>{{transportation}}</td></tr>
+                    <tr><th>Total</th><td><strong>₹{{total_amount}}</strong></td></tr>
+                </table>
+            </div>
+
+            <div class='terms'>
+                <p>1. {{term_1}}</p>
+                <p>2. {{term_2}}</p>
+                <p>3. Payment Terms: {{payment_terms}}</p>
+                <p>4. Actual billing will be done as per the number of pieces supplied.</p>
+                <p>5. Labour accommodation shall be provided.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
         logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:80px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
         html_filled = html_template
@@ -89,14 +146,22 @@ if st.button("Generate Document"):
         html_filled = html_filled.replace("{{delivery_address}}", delivery_address.replace("\n", "<br>"))
         html_filled = html_filled.replace("{{invoice_date}}", invoice_date.strftime('%d-%m-%Y'))
 
-        if items:
-            item = items[0]
-            html_filled = html_filled.replace("{{item_hsn}}", item['hsn'])
-            html_filled = html_filled.replace("{{item_description}}", item['desc'])
-            html_filled = html_filled.replace("{{item_qty}}", str(item['qty']))
-            html_filled = html_filled.replace("{{item_unit}}", item['unit'])
-            html_filled = html_filled.replace("{{item_rate}}", str(item['rate']))
-            html_filled = html_filled.replace("{{item_amount}}", f"{item['qty'] * item['rate']:,.2f}")
+        # Construct multiple line items rows
+        table_rows = ""
+        for item in items:
+            amount = item["qty"] * item["rate"]
+            table_rows += f"""
+            <tr>
+                <td>{item['hsn']}</td>
+                <td>{item['desc']}</td>
+                <td>{item['qty']}</td>
+                <td>{item['unit']}</td>
+                <td>{item['rate']}</td>
+                <td>{amount:,.2f}</td>
+            </tr>
+            """
+
+        html_filled = html_filled.replace("{{item_rows}}", table_rows)
 
         html_filled = html_filled.replace("{{subtotal}}", f"{total:,.2f}")
         html_filled = html_filled.replace("{{cgst}}", f"{total*0.09:,.2f}")

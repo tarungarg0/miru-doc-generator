@@ -128,12 +128,12 @@ if st.button("Generate PDF"):
                 </div>
             </div>
 
-            <div class="delivery-info">
+            <div class=\"delivery-info\" style=\"margin-bottom: 40px;\">
                 <div class="section-title">Delivery Address</div>
                 <div class="section-content">{delivery_address}</div>
             </div>
 
-            <table>
+            <div style=\"margin-top: 40px;\"></div><table>
                 <thead>
                     <tr>
                         <th>HSN</th><th>Description</th><th>QTY</th><th>Unit</th><th>Rate</th><th>Amount</th>

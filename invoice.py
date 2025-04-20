@@ -141,10 +141,10 @@ if st.button("Generate Document"):
     logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:80px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
     html_filled = html_template
     html_filled = html_filled.replace("{{logo}}", logo_html)
-        html_filled = html_filled.replace("{{document_type}}", doc_type)
-        html_filled = html_filled.replace("{{recipient_name}}", client_name)
-        html_filled = html_filled.replace("{{delivery_address}}", delivery_address.replace("\n", "<br>"))
-        html_filled = html_filled.replace("{{invoice_date}}", invoice_date.strftime('%d-%m-%Y'))
+    html_filled = html_filled.replace("{{document_type}}", doc_type)
+    html_filled = html_filled.replace("{{recipient_name}}", client_name)
+    html_filled = html_filled.replace("{{delivery_address}}", delivery_address.replace("\n", "<br>"))
+    html_filled = html_filled.replace("{{invoice_date}}", invoice_date.strftime('%d-%m-%Y'))
 
         # Construct multiple line items rows
         table_rows = ""

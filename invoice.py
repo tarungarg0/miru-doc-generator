@@ -140,7 +140,7 @@ if st.button("Generate Document"):
 
     logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:80px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
     html_filled = html_template
-        html_filled = html_filled.replace("{{logo}}", logo_html)
+    html_filled = html_filled.replace("{{logo}}", logo_html)
         html_filled = html_filled.replace("{{document_type}}", doc_type)
         html_filled = html_filled.replace("{{recipient_name}}", client_name)
         html_filled = html_filled.replace("{{delivery_address}}", delivery_address.replace("\n", "<br>"))
@@ -154,10 +154,10 @@ if st.button("Generate Document"):
             <tr>
                 <td>{item['hsn']}</td>
                 <td>{item['desc']}</td>
-                <td>{item['qty']}</td>
-                <td>{item['unit']}</td>
-                <td>{item['rate']}</td>
-                <td>{amount:,.2f}</td>
+                <td style='text-align:center;'>{item['qty']}</td>
+                <td style='text-align:center;'>{item['unit']}</td>
+                <td style='text-align:right;'>₹{item['rate']:,.2f}</td>
+                <td style='text-align:right;'>₹{amount:,.2f}</td>
             </tr>
             """
 

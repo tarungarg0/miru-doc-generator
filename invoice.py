@@ -85,7 +85,7 @@ if st.button("Generate PDF"):
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
         <title>Invoice</title>
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }}}
+            body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }}
             .container { max-width: 800px; margin: 0 auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
             .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
             .company-logo { width: 150px; height: auto; }

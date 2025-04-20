@@ -4,7 +4,6 @@ from urllib.parse import unquote
 import os
 import base64
 import pdfkit
-import requests
 from io import BytesIO
 
 # Load and encode logo
@@ -77,4 +76,45 @@ if st.button("Generate Document"):
     grand_total = round(total * 1.18)
 
     html_path = os.path.join(os.path.dirname(__file__), "pdf.html")
-    html_template = open(html_path, "r").read() if os.path.exists(html_path) else "<p><strong>HTML template missing.</strong></p>"
+    if not os.path.exists(html_path):
+        st.error("pdf.html template not found.")
+    else:
+        html_template = open(html_path, "r").read()
+
+        logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:80px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
+        html_filled = html_template
+        html_filled = html_filled.replace("{{logo}}", logo_html)
+        html_filled = html_filled.replace("{{document_type}}", doc_type)
+        html_filled = html_filled.replace("{{recipient_name}}", client_name)
+        html_filled = html_filled.replace("{{delivery_address}}", delivery_address.replace("\n", "<br>"))
+        html_filled = html_filled.replace("{{invoice_date}}", invoice_date.strftime('%d-%m-%Y'))
+
+        if items:
+            item = items[0]
+            html_filled = html_filled.replace("{{item_hsn}}", item['hsn'])
+            html_filled = html_filled.replace("{{item_description}}", item['desc'])
+            html_filled = html_filled.replace("{{item_qty}}", str(item['qty']))
+            html_filled = html_filled.replace("{{item_unit}}", item['unit'])
+            html_filled = html_filled.replace("{{item_rate}}", str(item['rate']))
+            html_filled = html_filled.replace("{{item_amount}}", f"{item['qty'] * item['rate']:,.2f}")
+
+        html_filled = html_filled.replace("{{subtotal}}", f"{total:,.2f}")
+        html_filled = html_filled.replace("{{cgst}}", f"{total*0.09:,.2f}")
+        html_filled = html_filled.replace("{{sgst}}", f"{total*0.09:,.2f}")
+        html_filled = html_filled.replace("{{transportation}}", transport_included)
+        html_filled = html_filled.replace("{{total_amount}}", f"{grand_total:,.2f}")
+        html_filled = html_filled.replace("{{term_1}}", terms[0] if len(terms) > 0 else "")
+        html_filled = html_filled.replace("{{term_2}}", terms[1] if len(terms) > 1 else "")
+        html_filled = html_filled.replace("{{payment_terms}}", terms[2] if len(terms) > 2 else "")
+
+        # Show HTML preview
+        st.components.v1.html(html_filled, height=1000, scrolling=True)
+
+        # Generate PDF from HTML
+        try:
+            config = pdfkit.configuration(wkhtmltopdf="/usr/bin/wkhtmltopdf")
+            pdf_bytes = pdfkit.from_string(html_filled, False, configuration=config)
+            filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"
+            st.download_button("\ud83d\udcc5 Download PDF", data=pdf_bytes, file_name=filename)
+        except Exception as e:
+            st.error(f"PDF generation failed: {e}")

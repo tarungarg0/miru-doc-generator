@@ -126,8 +126,7 @@ if st.button("Generate PDF"):
 
             <div class=\"delivery-info\">
                 <div class=\"section-title\">Delivery Address</div>
-                <div class=\"section-content\">{delivery_address.replace('
-', '<br>')}</div>
+                <div class=\"section-content\">{delivery_address.replace('\\n', '<br>')}</div>
             </div>
 
             <table>
@@ -137,7 +136,7 @@ if st.button("Generate PDF"):
                     </tr>
                 </thead>
                 <tbody>
-                    {{item_rows}}
+                    {item_rows}
                 </tbody>
             </table>
 

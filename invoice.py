@@ -75,7 +75,7 @@ if st.button("Generate PDF"):
     total = sum(item["qty"] * item["rate"] for item in items)
     grand_total = round(total * 1.18)
 
-    logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:80px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
+    logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:60px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
 
     html_template = f"""
     <!DOCTYPE html>

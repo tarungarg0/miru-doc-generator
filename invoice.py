@@ -115,7 +115,7 @@ if st.button("Generate PDF"):
     filled_html = html_template.replace("{{item_rows}}", item_rows)
 
     st.components.v1.html(filled_html, height=800, scrolling=True)
-        pdf_file = BytesIO()
+    pdf_file = BytesIO()
     pisa.CreatePDF(filled_html, dest=pdf_file)
     pdf_bytes = pdf_file.getvalue()
     filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"

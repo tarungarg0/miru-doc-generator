@@ -77,4 +77,4 @@ if st.button("Generate Document"):
     grand_total = round(total * 1.18)
 
     html_path = os.path.join(os.path.dirname(__file__), "pdf.html")
-    html_template = open(html_
+    html_template = open(html_path, "r").read() if os.path.exists(html_path) else "<p><strong>HTML template missing.</strong></p>"

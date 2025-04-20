@@ -1,4 +1,4 @@
 streamlit
 openpyxl
 pdfkit
-weasyprint
+xhtml2pdf

@@ -73,7 +73,7 @@ if st.button("Generate PDF"):
 
     logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:80px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
 
-    html_template = """
+    html_template = f"""
     <!DOCTYPE html>
     <html lang=\"en\">
     <head>

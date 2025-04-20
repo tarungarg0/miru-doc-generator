@@ -3,7 +3,7 @@ from datetime import datetime
 from urllib.parse import unquote
 import os
 import base64
-import pdfkit
+from weasyprint import HTML
 from io import BytesIO
 
 # Load and encode logo
@@ -110,10 +110,9 @@ if st.button("Generate Document"):
         # Show HTML preview
         st.components.v1.html(html_filled, height=1000, scrolling=True)
 
-        # Generate PDF from HTML
+        # Generate PDF from HTML using WeasyPrint
         try:
-            config = pdfkit.configuration(wkhtmltopdf="/usr/bin/wkhtmltopdf")
-            pdf_bytes = pdfkit.from_string(html_filled, False, configuration=config)
+            pdf_bytes = HTML(string=html_filled).write_pdf()
             filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"
             st.download_button("\ud83d\udcc5 Download PDF", data=pdf_bytes, file_name=filename)
         except Exception as e:

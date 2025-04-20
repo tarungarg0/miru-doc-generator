@@ -170,7 +170,7 @@ if st.button("Generate PDF"):
         for item in items
     ])
 
-    filled_html = html_template.replace("{{item_rows}}", item_rows)
+    filled_html = html_template.replace("{item_rows}", item_rows)
 
     st.components.v1.html(filled_html, height=800, scrolling=True)
     pdf_file = BytesIO()

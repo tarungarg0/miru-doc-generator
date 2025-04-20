@@ -138,7 +138,7 @@ if st.button("Generate Document"):
     </html>
     """
 
-        logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:80px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
+    logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:80px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
         html_filled = html_template
         html_filled = html_filled.replace("{{logo}}", logo_html)
         html_filled = html_filled.replace("{{document_type}}", doc_type)

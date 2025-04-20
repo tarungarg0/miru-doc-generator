@@ -74,38 +74,96 @@ if st.button("Generate PDF"):
     logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:80px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
 
     html_template = f"""
-    <html>
-    <head><style>
-        body {{ font-family: Arial; margin: 20px; }}
-        table {{ width: 100%; border-collapse: collapse; }}
-        th, td {{ border: 1px solid #ccc; padding: 8px; }}
-        th {{ background-color: #f0f0f0; }}
-    </style></head>
+    <!DOCTYPE html>
+    <html lang=\"en\">
+    <head>
+        <meta charset=\"UTF-8\">
+        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+        <title>Invoice</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }}
+            .container {{ max-width: 800px; margin: 0 auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }}
+            .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
+            .company-logo {{ width: 150px; height: auto; }}
+            .company-details {{ text-align: right; }}
+            .company-details p {{ margin: 0; }}
+            .document-type {{ text-align: right; font-size: 1.2em; margin-bottom: 20px; }}
+            .section-title {{ margin-bottom: 5px; font-weight: bold; }}
+            .section-content {{ margin-bottom: 20px; }}
+            .recipient-date {{ display: flex; justify-content: space-between; margin-bottom: 20px; }}
+            table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
+            table, th, td {{ border: 1px solid #ccc; }}
+            th, td {{ padding: 10px; text-align: left; }}
+            .total-section {{ display: flex; justify-content: flex-end; margin-top: 20px; }}
+            .total-table {{ width: 50%; border-collapse: collapse; }}
+            .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; }}
+            .terms, .billing-details {{ font-size: 0.9em; }}
+        </style>
+    </head>
     <body>
-        <div>{logo_html}</div>
-        <h2>{doc_type}</h2>
-        <p><strong>Client Name:</strong> {client_name}</p>
-        <p><strong>Delivery Address:</strong><br>{delivery_address.replace("\n", "<br>")}</p>
-        <p><strong>Invoice Date:</strong> {invoice_date.strftime('%d-%m-%Y')}</p>
+        <div class=\"container\">
+            <div class=\"header\">
+                <div><img src=\"{logo_html}\" alt=\"Company Logo\" class=\"company-logo\"></div>
+                <div class=\"company-details\">
+                    <p><strong>MIRU GRC</strong></p>
+                    <p>GST: 08AAJCM6422D1ZN</p>
+                    <p>Phone: +91 9116122250</p>
+                </div>
+            </div>
 
-        <table>
-            <tr><th>HSN</th><th>Description</th><th>QTY</th><th>Unit</th><th>Rate</th><th>Amount</th></tr>
-            {{item_rows}}
-        </table>
+            <div class=\"document-type\"><strong>{doc_type}</strong></div>
 
-        <p><strong>Subtotal:</strong> ₹{total:,.2f}</p>
-        <p><strong>CGST:</strong> ₹{total*0.09:,.2f}</p>
-        <p><strong>SGST:</strong> ₹{total*0.09:,.2f}</p>
-        <p><strong>Transportation:</strong> {transport_included}</p>
-        <p><strong>Total:</strong> ₹{grand_total:,.2f}</p>
+            <div class=\"recipient-date\">
+                <div>
+                    <div class=\"section-title\">Recipient</div>
+                    <div class=\"section-content\">{client_name}</div>
+                </div>
+                <div style=\"text-align: right;\">
+                    <div class=\"section-title\">Date</div>
+                    <div class=\"section-content\">{invoice_date.strftime('%d-%m-%Y')}</div>
+                </div>
+            </div>
 
-        <h4>Terms & Conditions</h4>
-        <ul>
-            <li>{terms[0] if len(terms) > 0 else ''}</li>
-            <li>{terms[1] if len(terms) > 1 else ''}</li>
-            <li>Payment Terms: {terms[2] if len(terms) > 2 else ''}</li>
-        </ul>
-    </body></html>
+            <div class=\"delivery-info\">
+                <div class=\"section-title\">Delivery Address</div>
+                <div class=\"section-content\">{delivery_address.replace("
+", "<br>")}</div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>HSN</th><th>Description</th><th>QTY</th><th>Unit</th><th>Rate</th><th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{item_rows}}
+                </tbody>
+            </table>
+
+            <div class=\"total-section\">
+                <table class=\"total-table\">
+                    <tr><th>Subtotal:</th><td>₹{total:,.2f}</td></tr>
+                    <tr><th>CGST:</th><td>₹{total*0.09:,.2f}</td></tr>
+                    <tr><th>SGST:</th><td>₹{total*0.09:,.2f}</td></tr>
+                    <tr><th>Transportation:</th><td>{transport_included}</td></tr>
+                    <tr><th><strong>Total (Round off):</strong></th><td><strong>₹{grand_total:,.2f}</strong></td></tr>
+                </table>
+            </div>
+
+            <div class=\"terms\">
+                <div class=\"section-title\">Terms</div>
+                <div class=\"section-content\">
+                    <p>1. {terms[0] if len(terms) > 0 else ''}</p>
+                    <p>2. {terms[1] if len(terms) > 1 else ''}</p>
+                    <p>3. Payment Terms: {terms[2] if len(terms) > 2 else ''}</p>
+                    <p>4. Actual billing will be done as per the number of pieces supplied.</p>
+                    <p>5. Labour accommodation shall be provided.</p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
     """
 
     item_rows = "".join([

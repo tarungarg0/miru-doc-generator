@@ -15,7 +15,7 @@ def get_base64_image(image_path):
     with open(image_path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode('utf-8')
 
-logo_path = "logo.png"
+logo_path = "Avisa_GRC_Black_290.png"
 logo_base64 = get_base64_image(logo_path) if os.path.exists(logo_path) else None
 
 # Streamlit UI

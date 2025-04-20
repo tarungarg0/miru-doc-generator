@@ -107,7 +107,7 @@ if st.button("Generate PDF"):
     <body>
         <div class="container">
             <div class="header">
-                <div><img src="{logo_html}" alt="Company Logo" class="company-logo"></div>
+                <div>{logo_html}</div>
                 <div class="company-details">
                     <p><strong>MIRU GRC</strong></p>
                     <p>GST: 08AAJCM6422D1ZN</p>

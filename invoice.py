@@ -2,7 +2,8 @@ import streamlit as st
 from datetime import datetime
 from urllib.parse import unquote
 import base64
-from weasyprint import HTML
+from xhtml2pdf import pisa
+from io import BytesIO
 
 # Load and encode logo
 def get_base64_image(image_path):
@@ -114,6 +115,8 @@ if st.button("Generate PDF"):
     filled_html = html_template.replace("{{item_rows}}", item_rows)
 
     st.components.v1.html(filled_html, height=800, scrolling=True)
-    pdf_bytes = HTML(string=filled_html).write_pdf()
+    pdf_file = BytesIO()
+pisa.CreatePDF(filled_html, dest=pdf_file)
+pdf_bytes = pdf_file.getvalue()
     filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"
     st.download_button("📥 Download PDF", data=pdf_bytes, file_name=filename)

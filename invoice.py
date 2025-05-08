@@ -2,9 +2,8 @@ import streamlit as st
 from datetime import datetime
 from urllib.parse import unquote
 import base64
-from weasyprint import HTML
-HTML(string=filled_html).write_pdf(pdf_file)
 from io import BytesIO
+import os
 
 # Load and encode logo
 def get_base64_image(image_path):
@@ -12,18 +11,17 @@ def get_base64_image(image_path):
         return base64.b64encode(img_file.read()).decode('utf-8')
 
 logo_path = "Avisa_GRC_Black_290.png"
-import os
 logo_base64 = get_base64_image(logo_path) if os.path.exists(logo_path) else None
 
 st.markdown("""
     <h2 style='text-align: center; font-family: Bebas Neue Pro Expanded;'>MIRU Document Generator</h2>
     <hr style='margin-top: 0;'>
-    <style>{{
-        label, .stTextInput>div>div>input, .stTextArea textarea, .stNumberInput input {{{{
+    <style>{
+        label, .stTextInput>div>div>input, .stTextArea textarea, .stNumberInput input {{
             font-size: 16px;
             font-family: 'Bebas Neue Pro Expanded', sans-serif;
             color: #2E2E2E;
-        }}}}}
+        }}
         .stRadio label {
             font-size: 16px;
             font-family: 'Bebas Neue Pro Expanded', sans-serif;
@@ -34,7 +32,7 @@ st.markdown("""
             font-family: 'Bebas Neue Pro Expanded', sans-serif;
             letter-spacing: 1px;
         }
-    }}</style>
+    }</style>
 """, unsafe_allow_html=True)
 
 query_params = st.query_params
@@ -68,7 +66,7 @@ for i in range(item_count):
     rate = st.number_input(f"Rate {i+1}", key=f"rate_{i}", value=rate_default)
     items.append({"hsn": hsn, "desc": desc, "qty": qty, "unit": unit, "rate": rate})
 
-if st.button("Generate PDF"):
+if st.button("Generate Print View"):
     item_rows = "".join([
         f"<tr><td>{item['hsn']}</td><td>{item['desc']}</td><td>{item['qty']}</td><td>{item['unit']}</td><td>₹{item['rate']}</td><td>₹{item['qty'] * item['rate']:,.2f}</td></tr>"
         for item in items
@@ -80,17 +78,15 @@ if st.button("Generate PDF"):
 
     html_template = f"""
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang=\"en\">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta charset=\"UTF-8\">
+        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
         <title>Invoice</title>
         <style>
             body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }}
             .container {{ max-width: 800px; margin: 0 auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }}
             .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
-            .company-logo {{ width: 150px; height: auto; }}
-            .company-details {{ text-align: right; }}
             .company-details p {{ margin: 0; }}
             .document-type {{ text-align: right; font-size: 1.2em; margin-bottom: 20px; }}
             .section-title {{ margin-bottom: 5px; font-weight: bold; }}
@@ -102,51 +98,44 @@ if st.button("Generate PDF"):
             .total-section {{ display: flex; justify-content: flex-end; margin-top: 20px; }}
             .total-table {{ width: 50%; border-collapse: collapse; }}
             .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; }}
-            .terms, .billing-details {{ font-size: 0.9em; }}
+            .terms {{ font-size: 0.9em; }}
+            button.print-button {{ position: fixed; top: 20px; right: 20px; background: black; color: white; padding: 10px 20px; font-family: Bebas Neue Pro Expanded, sans-serif; border: none; font-size: 16px; cursor: pointer; }}
         </style>
     </head>
     <body>
-        <div class="container">
-            <div class="header">
+        <button class=\"print-button\" onclick=\"window.print()\">🖨️ Print / Save as PDF</button>
+        <div class=\"container\">
+            <div class=\"header\">
                 <div>{logo_html}</div>
-                <div class="company-details">
+                <div class=\"company-details\">
                     <p><strong>A Brand of RMT GREEN BUILDERS</strong></p>
                     <p>GST: 08AAJCM6422D1ZN</p>
                     <p>Phone: +91 9310519154 | Mail : contact@mirugrc.com</p>
                 </div>
             </div>
-
-            <div class="document-type"><strong>{doc_type}</strong></div>
-
-            <div class="recipient-date">
+            <div class=\"document-type\"><strong>{doc_type}</strong></div>
+            <div class=\"recipient-date\">
                 <div>
-                    <div class="section-title">Recipient</div>
-                    <div class="section-content">{client_name}</div>
+                    <div class=\"section-title\">Recipient</div>
+                    <div class=\"section-content\">{client_name}</div>
                 </div>
-                <div style="text-align: right;">
-                    <div class="section-title">Date</div>
-                    <div class="section-content">{invoice_date}</div>
+                <div style=\"text-align: right;\">
+                    <div class=\"section-title\">Date</div>
+                    <div class=\"section-content\">{invoice_date}</div>
                 </div>
             </div>
-
             <div class=\"delivery-info\" style=\"margin-bottom: 40px;\">
-                <div class="section-title">Delivery Address</div>
-                <div class="section-content">{delivery_address}</div>
+                <div class=\"section-title\">Delivery Address</div>
+                <div class=\"section-content\">{delivery_address}</div>
             </div>
-
-            <div style=\"margin-top: 40px;\"></div><table>
+            <table>
                 <thead>
-                    <tr>
-                        <th>HSN</th><th>Description</th><th>QTY</th><th>Unit</th><th>Rate</th><th>Amount</th>
-                    </tr>
+                    <tr><th>HSN</th><th>Description</th><th>QTY</th><th>Unit</th><th>Rate</th><th>Amount</th></tr>
                 </thead>
-                <tbody>
-                    {item_rows}
-                </tbody>
+                <tbody>{item_rows}</tbody>
             </table>
-
-            <div class="total-section">
-                <table class="total-table">
+            <div class=\"total-section\">
+                <table class=\"total-table\">
                     <tr><th>Subtotal:</th><td>₹{total:,.2f}</td></tr>
                     <tr><th>CGST:</th><td>₹{total*0.09:,.2f}</td></tr>
                     <tr><th>SGST:</th><td>₹{total*0.09:,.2f}</td></tr>
@@ -154,17 +143,10 @@ if st.button("Generate PDF"):
                     <tr><th><strong>Total (Round off):</strong></th><td><strong>₹{grand_total:,.2f}</strong></td></tr>
                 </table>
             </div>
-
-            <div class="terms">
-                <div class="section-title">Terms</div>
-                <div class="section-content">
-                    <p>1. {terms[0] if len(terms) > 0 else ''}</p>
-                    <p>2. {terms[1] if len(terms) > 1 else ''}</p>
-                    <p>3. {terms[2] if len(terms) > 2 else ''}</p>
-                    <p>3. {terms[3] if len(terms) > 3 else ''}</p>
-                    <p>3. {terms[4] if len(terms) > 4 else ''}</p>
-                    <p>3. {terms[5] if len(terms) > 5 else ''}</p>
-                    <p>3. {terms[6] if len(terms) > 6 else ''}</p>
+            <div class=\"terms\">
+                <div class=\"section-title\">Terms</div>
+                <div class=\"section-content\">
+                    {''.join([f'<p>{i+1}. {t}</p>' for i, t in enumerate(terms)])}
                 </div>
             </div>
         </div>
@@ -172,16 +154,4 @@ if st.button("Generate PDF"):
     </html>
     """
 
-    item_rows = "".join([
-        f"<tr><td>{item['hsn']}</td><td>{item['desc']}</td><td>{item['qty']}</td><td>{item['unit']}</td><td>₹{item['rate']}</td><td>₹{item['qty'] * item['rate']:,.2f}</td></tr>"
-        for item in items
-    ])
-
-    filled_html = html_template.replace("{item_rows}", item_rows)
-
-    st.components.v1.html(filled_html, height=800, scrolling=True)
-    pdf_file = BytesIO()
-    pisa.CreatePDF(filled_html, dest=pdf_file)
-    pdf_bytes = pdf_file.getvalue()
-    filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"
-    st.download_button("📥 Download PDF", data=pdf_bytes, file_name=filename)
+    st.components.v1.html(html_template, height=1100, scrolling=True)

@@ -2,7 +2,8 @@ import streamlit as st
 from datetime import datetime
 from urllib.parse import unquote
 import base64
-from xhtml2pdf import pisa
+from weasyprint import HTML
+HTML(string=filled_html).write_pdf(pdf_file)
 from io import BytesIO
 
 # Load and encode logo

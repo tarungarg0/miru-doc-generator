@@ -4,11 +4,23 @@ from urllib.parse import unquote
 import base64
 from io import BytesIO
 import os
+import requests
 
 # Load and encode logo
 def get_base64_image(image_path):
     with open(image_path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode('utf-8')
+
+def generate_pdf_via_pdfshift(html_content, api_key):
+    response = requests.post(
+        "https://api.pdfshift.io/v3/convert/html",
+        auth=(api_key, ""),
+        json={"source": html_content}
+    )
+    if response.status_code == 200:
+        return response.content  # PDF bytes
+    else:
+        raise Exception(f"PDFShift error: {response.text}")
 
 logo_path = "Avisa_GRC_Black_290.png"
 logo_base64 = get_base64_image(logo_path) if os.path.exists(logo_path) else None
@@ -66,7 +78,7 @@ for i in range(item_count):
     rate = st.number_input(f"Rate {i+1}", key=f"rate_{i}", value=rate_default)
     items.append({"hsn": hsn, "desc": desc, "qty": qty, "unit": unit, "rate": rate})
 
-if st.button("Generate Print View"):
+if st.button("Generate & Download PDF"):
     item_rows = "".join([
         f"<tr><td>{item['hsn']}</td><td>{item['desc']}</td><td>{item['qty']}</td><td>{item['unit']}</td><td>₹{item['rate']}</td><td>₹{item['qty'] * item['rate']:,.2f}</td></tr>"
         for item in items
@@ -84,8 +96,8 @@ if st.button("Generate Print View"):
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
         <title>Invoice</title>
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }}
-            .container {{ max-width: 800px; margin: 0 auto; padding: 20px; background-color: #fff; }}
+            body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #fff; }}
+            .container {{ width: 100%; padding: 20px; }}
             .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
             .company-details p {{ margin: 0; }}
             .document-type {{ text-align: right; font-size: 1.2em; margin-bottom: 20px; }}
@@ -99,16 +111,9 @@ if st.button("Generate Print View"):
             .total-table {{ width: 50%; border-collapse: collapse; }}
             .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; }}
             .terms {{ font-size: 0.9em; }}
-            button.print-button {{ position: fixed; top: 20px; right: 20px; background: black; color: white; padding: 10px 20px; font-family: Bebas Neue Pro Expanded, sans-serif; border: none; font-size: 16px; cursor: pointer; }}
-            @media print {{
-                .container {{ box-shadow: none; border-radius: 0; margin: 0; padding: 0; width: 100%; }}
-                button.print-button {{ display: none; }}
-                @page {{ margin: 0; }}
-            }}
         </style>
     </head>
     <body>
-        <button class=\"print-button\" onclick=\"window.print()\">🖨️ Print / Save as PDF</button>
         <div class=\"container\">
             <div class=\"header\">
                 <div>{logo_html}</div>
@@ -129,7 +134,7 @@ if st.button("Generate Print View"):
                     <div class=\"section-content\">{invoice_date}</div>
                 </div>
             </div>
-            <div class=\"delivery-info\" style=\"margin-bottom: 40px;\">
+            <div class=\"delivery-info\">
                 <div class=\"section-title\">Delivery Address</div>
                 <div class=\"section-content\">{delivery_address}</div>
             </div>
@@ -159,4 +164,5 @@ if st.button("Generate Print View"):
     </html>
     """
 
-    st.components.v1.html(html_template, height=1100, scrolling=True)
+    pdf_bytes = generate_pdf_via_pdfshift(html_template, api_key="sk_88943b382b397ffad693e58263b73a60598f2e8b")
+    st.download_button("📥 Download PDF", data=pdf_bytes, file_name=f"{doc_type}_{client_name.replace(' ', '_')}.pdf")

@@ -109,9 +109,9 @@ if st.button("Generate PDF"):
             <div class="header">
                 <div>{logo_html}</div>
                 <div class="company-details">
-                    <p><strong>MIRU GRC</strong></p>
+                    <p><strong>A Brand of RMT GREEN BUILDERS</strong></p>
                     <p>GST: 08AAJCM6422D1ZN</p>
-                    <p>Phone: +91 9116122250</p>
+                    <p>Phone: +91 9310519154 | Mail : contact@mirugrc.com</p>
                 </div>
             </div>
 

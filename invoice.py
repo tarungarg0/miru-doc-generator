@@ -18,9 +18,10 @@ def generate_pdf_via_pdfshift(html_content, api_key):
         json={"source": html_content}
     )
     if response.status_code == 200:
-        return response.content  # PDF bytes
+        return response.content
     else:
-        raise Exception(f"PDFShift error: {response.text}")
+        st.error(f"❌ PDFShift Error {response.status_code}: {response.text}")
+        return None
 
 logo_path = "Avisa_GRC_Black_290.png"
 logo_base64 = get_base64_image(logo_path) if os.path.exists(logo_path) else None
@@ -165,4 +166,5 @@ if st.button("Generate & Download PDF"):
     """
 
     pdf_bytes = generate_pdf_via_pdfshift(html_template, api_key="sk_88943b382b397ffad693e58263b73a60598f2e8b")
-    st.download_button("📥 Download PDF", data=pdf_bytes, file_name=f"{doc_type}_{client_name.replace(' ', '_')}.pdf")
+    if pdf_bytes:
+        st.download_button("📥 Download PDF", data=pdf_bytes, file_name=f"{doc_type}_{client_name.replace(' ', '_')}.pdf")

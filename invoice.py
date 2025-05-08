@@ -31,8 +31,8 @@ st.markdown("""
             color: white;
             font-family: 'Bebas Neue Pro Expanded', sans-serif;
             letter-spacing: 1px;
-        }
-    }</style>
+        }}
+    </style>
 """, unsafe_allow_html=True)
 
 query_params = st.query_params
@@ -85,7 +85,7 @@ if st.button("Generate Print View"):
         <title>Invoice</title>
         <style>
             body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }}
-            .container {{ max-width: 800px; margin: 0 auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }}
+            .container {{ max-width: 800px; margin: 0 auto; padding: 20px; background-color: #fff; }}
             .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
             .company-details p {{ margin: 0; }}
             .document-type {{ text-align: right; font-size: 1.2em; margin-bottom: 20px; }}
@@ -100,6 +100,11 @@ if st.button("Generate Print View"):
             .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; }}
             .terms {{ font-size: 0.9em; }}
             button.print-button {{ position: fixed; top: 20px; right: 20px; background: black; color: white; padding: 10px 20px; font-family: Bebas Neue Pro Expanded, sans-serif; border: none; font-size: 16px; cursor: pointer; }}
+            @media print {{
+                .container {{ box-shadow: none; border-radius: 0; margin: 0; padding: 0; width: 100%; }}
+                button.print-button {{ display: none; }}
+                @page {{ margin: 0; }}
+            }}
         </style>
     </head>
     <body>

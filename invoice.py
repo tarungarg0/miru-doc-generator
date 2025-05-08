@@ -13,7 +13,7 @@ def get_base64_image(image_path):
 
 def generate_pdf_via_pdfshift(html_content, api_key):
     response = requests.post(
-        "https://api.pdfshift.io/v3/convert",
+        "https://api.pdfshift.io/v3/convert/pdf",
         auth=(api_key, ""),
         json={"source": html_content}
     )

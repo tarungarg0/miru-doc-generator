@@ -159,9 +159,11 @@ if st.button("Generate PDF"):
                 <div class="section-content">
                     <p>1. {terms[0] if len(terms) > 0 else ''}</p>
                     <p>2. {terms[1] if len(terms) > 1 else ''}</p>
-                    <p>3. Payment Terms: {terms[2] if len(terms) > 2 else ''}</p>
-                    <p>4. Actual billing will be done as per the number of pieces supplied.</p>
-                    <p>5. Labour accommodation shall be provided.</p>
+                    <p>3. {terms[2] if len(terms) > 2 else ''}</p>
+                    <p>3. {terms[3] if len(terms) > 3 else ''}</p>
+                    <p>3. {terms[4] if len(terms) > 4 else ''}</p>
+                    <p>3. {terms[5] if len(terms) > 5 else ''}</p>
+                    <p>3. {terms[6] if len(terms) > 6 else ''}</p>
                 </div>
             </div>
         </div>

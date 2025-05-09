@@ -20,7 +20,7 @@ def generate_pdf_via_pdfshift(html_content):
         },
         json={
             "source": html_content,
-            "sandbox": True  # set to False for production
+            "sandbox": False  # set to False for production
         }
     )
     if response.status_code == 200:
@@ -103,7 +103,7 @@ if st.button("Generate & Download PDF"):
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
         <title>Invoice</title>
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #fff; }}
+            body { font-family: Arial, sans-serif; margin: 0; padding: 20px 30px 20px 20px; background-color: #fff; }}
             .container {{ width: 100%; padding: 20px; }}
             .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
             .company-details p {{ margin: 0; }}

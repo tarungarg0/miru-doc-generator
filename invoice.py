@@ -107,7 +107,7 @@ if st.button("Generate & Download PDF"):
             .container {{ width: 100%; padding: 20px; }}
             .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
             .company-details p {{ margin: 0; }}
-            .document-type {{ text-align: right; font-size: 1.2em; margin-bottom: 20px; }}
+            .document-type {{ text-align: right; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; }}
             .section-title {{ margin-bottom: 5px; font-weight: bold; }}
             .section-content {{ margin-bottom: 20px; }}
             .recipient-date {{ display: flex; justify-content: space-between; margin-bottom: 20px; }}
@@ -131,7 +131,7 @@ if st.button("Generate & Download PDF"):
                 </div>
             </div>
             <div class=\"document-type\"><strong>{doc_type}</strong></div>
-            <div class=\"recipient-date\">
+            <div class=\"recipient-date\" style=\"margin-top: 40px;\">
                 <div>
                     <div class=\"section-title\">Recipient</div>
                     <div class=\"section-content\">{client_name}</div>
@@ -141,17 +141,17 @@ if st.button("Generate & Download PDF"):
                     <div class=\"section-content\">{invoice_date}</div>
                 </div>
             </div>
-            <div class=\"delivery-info\">
+            <div class=\"delivery-info\" style=\"margin-top: 40px;\">
                 <div class=\"section-title\">Delivery Address</div>
                 <div class=\"section-content\">{delivery_address}</div>
             </div>
-            <table>
+            <table style=\"margin-top: 40px;\">
                 <thead>
                     <tr><th>HSN</th><th>Description</th><th>QTY</th><th>Unit</th><th>Rate</th><th>Amount</th></tr>
                 </thead>
                 <tbody>{item_rows}</tbody>
             </table>
-            <div class=\"total-section\">
+            <div class=\"total-section\" style=\"margin-top: 40px;\">
                 <table class=\"total-table\">
                     <tr><th>Subtotal:</th><td>₹{total:,.2f}</td></tr>
                     <tr><th>CGST:</th><td>₹{total*0.09:,.2f}</td></tr>
@@ -160,7 +160,7 @@ if st.button("Generate & Download PDF"):
                     <tr><th><strong>Total (Round off):</strong></th><td><strong>₹{grand_total:,.2f}</strong></td></tr>
                 </table>
             </div>
-            <div class=\"terms\">
+            <div class=\"terms\" style=\"margin-top: 40px;\">
                 <div class=\"section-title\">Terms</div>
                 <div class=\"section-content\">
                     {''.join([f'<p>{i+1}. {t}</p>' for i, t in enumerate(terms)])}

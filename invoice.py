@@ -2,38 +2,14 @@ import streamlit as st
 from datetime import datetime
 from urllib.parse import unquote
 import base64
+from xhtml2pdf import pisa
 from io import BytesIO
 import os
-import requests
-
-# Load embedded fonts
-bold_font_base64 = "AAEAAAASAQAABAAgR0RFRrRCsIIAA..."
-extrabold_font_base64 = "AAEAAAASAQAABAAgR0RFRjZApW..."
-regular_font_base64 = "AAEAAAARAQAABAA...""/mnt/data/Bebas-Neue-Pro-Expanded.ttf", "rb") as f:
-    regular_font_base64 = base64.b64encode(f.read()).decode("utf-8")
 
 # Load and encode logo
 def get_base64_image(image_path):
     with open(image_path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode('utf-8')
-
-def generate_pdf_via_pdfshift(html_content):
-    response = requests.post(
-        "https://api.pdfshift.io/v3/convert/pdf",
-        headers={
-            "X-API-Key": "sk_b043ae1f2d6f66581b3d6ccce3884a0f750967e3",
-            "Content-Type": "application/json"
-        },
-        json={
-            "source": html_content,
-            "sandbox": False  # set to False for production
-        }
-    )
-    if response.status_code == 200:
-        return response.content
-    else:
-        st.error(f"❌ PDFShift Error {response.status_code}: {response.text}")
-        return None
 
 logo_path = "Avisa_GRC_Black_290.png"
 logo_base64 = get_base64_image(logo_path) if os.path.exists(logo_path) else None
@@ -42,11 +18,11 @@ st.markdown("""
     <h2 style='text-align: center; font-family: Bebas Neue Pro Expanded;'>MIRU Document Generator</h2>
     <hr style='margin-top: 0;'>
     <style>{
-        label, .stTextInput>div>div>input, .stTextArea textarea, .stNumberInput input {{
+        label, .stTextInput>div>div>input, .stTextArea textarea, .stNumberInput input {
             font-size: 16px;
             font-family: 'Bebas Neue Pro Expanded', sans-serif;
             color: #2E2E2E;
-        }}
+        }
         .stRadio label {
             font-size: 16px;
             font-family: 'Bebas Neue Pro Expanded', sans-serif;
@@ -56,8 +32,8 @@ st.markdown("""
             color: white;
             font-family: 'Bebas Neue Pro Expanded', sans-serif;
             letter-spacing: 1px;
-        }}
-    </style>
+        }
+    }</style>
 """, unsafe_allow_html=True)
 
 query_params = st.query_params
@@ -91,7 +67,7 @@ for i in range(item_count):
     rate = st.number_input(f"Rate {i+1}", key=f"rate_{i}", value=rate_default)
     items.append({"hsn": hsn, "desc": desc, "qty": qty, "unit": unit, "rate": rate})
 
-if st.button("Generate & Download PDF"):
+if st.button("Generate PDF"):
     item_rows = "".join([
         f"<tr><td>{item['hsn']}</td><td>{item['desc']}</td><td>{item['qty']}</td><td>{item['unit']}</td><td>₹{item['rate']}</td><td>₹{item['qty'] * item['rate']:,.2f}</td></tr>"
         for item in items
@@ -101,100 +77,10 @@ if st.button("Generate & Download PDF"):
 
     logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:60px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
 
-    html_template = f"""
-    <!DOCTYPE html>
-    <html lang=\"en\">
-    <head>
-        <meta charset=\"UTF-8\">
-        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
-        <title>Invoice</title>
-<style>
-@font-face {
-  font-family: 'Bebas Neue Pro Expanded';
-  src: url(data:font/truetype;charset=utf-8;base64,{bold_font_base64}) format('truetype');
-  font-weight: normal;
-}
+    html_template = f"""<html><body><h1>{doc_type}</h1><table border='1'><thead><tr><th>HSN</th><th>Description</th><th>QTY</th><th>Unit</th><th>Rate</th><th>Amount</th></tr></thead><tbody>{item_rows}</tbody></table><p>Total: ₹{grand_total:,.2f}</p></body></html>"""
 
-@font-face {
-  font-family: 'Bebas Neue Pro Expanded XBold';
-  src: url(data:font/truetype;charset=utf-8;base64,{extrabold_font_base64}) format('truetype');
-  font-weight: bold;
-}
-
-@font-face {
-  font-family: 'Bebas Neue Pro Regular';
-  src: url(data:font/truetype;charset=utf-8;base64,{regular_font_base64}) format('truetype');
-  font-weight: normal;
-}
-
-            body {{ font-family: 'Bebas Neue Pro Expanded', sans-serif; margin: 40px 70px; background-color: #fff; }}
-            .container {{ width: 100%; padding: 20px; }}
-            .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
-            .company-details p {{ margin: 0; }}
-            .document-type {{ text-align: right; font-size: 24px; font-weight: bold; font-family: 'Bebas Neue Pro Expanded XBold', sans-serif; margin-top: 40px; margin-bottom: 20px; }}
-            .section-title {{ margin-bottom: 5px; font-weight: bold; }}
-            .section-content {{ margin-bottom: 20px; }}
-            .recipient-date {{ display: flex; justify-content: space-between; margin-bottom: 20px; }}
-            table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
-            table, th, td {{ border: 1px solid #ccc; font-family: 'Bebas Neue Pro Expanded', sans-serif; font-size: 14px; }}
-            th, td {{ padding: 10px; text-align: left; }}
-            .total-section {{ display: flex; justify-content: flex-end; margin-top: 20px; }}
-            .total-table {{ width: 50%; border-collapse: collapse; }}
-            .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; font-size: 14px; font-family: 'Bebas Neue Pro Expanded XBold', sans-serif; }}
-            .terms {{ font-size: 11px; font-family: 'Bebas Neue Pro', sans-serif; }}
-        </style>
-    </head>
-    <body>
-        <div class=\"container\">
-            <div class=\"header\">
-                <div>{logo_html}</div>
-                <div class=\"company-details\">
-                    <p><strong>A Brand of RMT GREEN BUILDERS</strong></p>
-                    <p>GST: 08AAJCM6422D1ZN</p>
-                    <p>Phone: +91 9310519154 | Mail : contact@mirugrc.com</p>
-                </div>
-            </div>
-            <div class=\"document-type\"><strong>{doc_type}</strong></div>
-            <div class=\"recipient-date\" style=\"margin-top: 40px;\">
-                <div>
-                    <div class=\"section-title\">Recipient</div>
-                    <div class=\"section-content\">{client_name}</div>
-                </div>
-                <div style=\"text-align: right;\">
-                    <div class=\"section-title\">Date</div>
-                    <div class=\"section-content\">{invoice_date}</div>
-                </div>
-            </div>
-            <div class=\"delivery-info\" style=\"margin-top: 40px;\">
-                <div class=\"section-title\">Delivery Address</div>
-                <div class=\"section-content\">{delivery_address}</div>
-            </div>
-            <table style=\"margin-top: 40px;\">
-                <thead>
-                    <tr><th>HSN</th><th>Description</th><th>QTY</th><th>Unit</th><th>Rate</th><th>Amount</th></tr>
-                </thead>
-                <tbody>{item_rows}</tbody>
-            </table>
-            <div class=\"total-section\" style=\"margin-top: 40px;\">
-                <table class=\"total-table\">
-                    <tr><th>Subtotal:</th><td>₹{total:,.2f}</td></tr>
-                    <tr><th>CGST:</th><td>₹{total*0.09:,.2f}</td></tr>
-                    <tr><th>SGST:</th><td>₹{total*0.09:,.2f}</td></tr>
-                    <tr><th>Transportation:</th><td>{transport_included}</td></tr>
-                    <tr><th><strong>Total (Round off):</strong></th><td><strong>₹{grand_total:,.2f}</strong></td></tr>
-                </table>
-            </div>
-            <div class=\"terms\" style=\"margin-top: 40px;\">
-                <div class=\"section-title\">Terms</div>
-                <div class=\"section-content\">
-                    {''.join([f'<p>{i+1}. {t}</p>' for i, t in enumerate(terms)])}
-                </div>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-    pdf_bytes = generate_pdf_via_pdfshift(html_template)
-    if pdf_bytes:
-        st.download_button("📥 Download PDF", data=pdf_bytes, file_name=f"{doc_type}_{client_name.replace(' ', '_')}.pdf")
+    pdf_file = BytesIO()
+    pisa.CreatePDF(html_template, dest=pdf_file)
+    pdf_bytes = pdf_file.getvalue()
+    filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"
+    st.download_button("📥 Download PDF", data=pdf_bytes, file_name=filename)

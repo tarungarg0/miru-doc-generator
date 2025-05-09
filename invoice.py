@@ -102,7 +102,18 @@ if st.button("Generate & Download PDF"):
         <meta charset=\"UTF-8\">
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
         <title>Invoice</title>
-        <style>
+        @font-face {
+  font-family: 'Bebas Neue Pro Expanded';
+  src: url(data:font/truetype;charset=utf-8;base64,{{bold_font}}) format('truetype');
+  font-weight: normal;
+}
+
+@font-face {
+  font-family: 'Bebas Neue Pro Expanded XBold';
+  src: url(data:font/truetype;charset=utf-8;base64,{{extrabold_font}}) format('truetype');
+  font-weight: bold;
+}
+
             body {{ font-family: 'Bebas Neue Pro Expanded', sans-serif; margin: 40px 70px; background-color: #fff; }}
             .container {{ width: 100%; padding: 20px; }}
             .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}

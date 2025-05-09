@@ -171,6 +171,6 @@ if st.button("Generate & Download PDF"):
     </html>
     """
 
-    pdf_bytes = generate_pdf_via_pdfshift(html_template, api_key="sk_b043ae1f2d6f66581b3d6ccce3884a0f750967e3")
+    pdf_bytes = generate_pdf_via_pdfshift(html_template)
     if pdf_bytes:
         st.download_button("📥 Download PDF", data=pdf_bytes, file_name=f"{doc_type}_{client_name.replace(' ', '_')}.pdf")

@@ -138,7 +138,8 @@ if st.button("Generate & Download PDF"):
                 <div class=\"company-details\">
                     <p><strong>A Brand of RMT GREEN BUILDERS</strong></p>
                     <p>GST: 08AAJCM6422D1ZN</p>
-                    <p>Phone: +91 9310519154 | Mail : contact@mirugrc.com</p>
+                    <p>Phone: +91 9310519154 </p>
+                    <p> Mail : contact@mirugrc.com</p>
                 </div>
             </div>
             <div class=\"document-type\"><strong>{doc_type}</strong></div>

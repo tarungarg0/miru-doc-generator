@@ -11,11 +11,17 @@ def get_base64_image(image_path):
     with open(image_path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode('utf-8')
 
-def generate_pdf_via_pdfshift(html_content, api_key):
+def generate_pdf_via_pdfshift(html_content):
     response = requests.post(
         "https://api.pdfshift.io/v3/convert/pdf",
-        auth=(api_key, ""),
-        json={"source": html_content}
+        headers={
+            "X-API-Key": "sk_b043ae1f2d6f66581b3d6ccce3884a0f750967e3",
+            "Content-Type": "application/json"
+        },
+        json={
+            "source": html_content,
+            "sandbox": True  # set to False for production
+        }
     )
     if response.status_code == 200:
         return response.content

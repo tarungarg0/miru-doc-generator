@@ -103,7 +103,7 @@ if st.button("Generate & Download PDF"):
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
         <title>Invoice</title>
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px 30px 20px 20px; background-color: #fff; }}
+            body {{ font-family: Arial, sans-serif; margin: 40px 50px; background-color: #fff; }}
             .container {{ width: 100%; padding: 20px; }}
             .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
             .company-details p {{ margin: 0; }}

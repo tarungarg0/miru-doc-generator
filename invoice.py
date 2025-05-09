@@ -107,7 +107,7 @@ if st.button("Generate & Download PDF"):
             .container {{ width: 100%; padding: 20px; }}
             .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
             .company-details p {{ margin: 0; }}
-            .document-type {{ text-align: right; font-size: 24px; font-weight: bold; font-family: 'Bebas Neue Pro Expanded XBold', sans-serif; margin-top: 40px; margin-bottom: 20px; }}}
+            .document-type {{ text-align: right; font-size: 24px; font-weight: bold; font-family: 'Bebas Neue Pro Expanded XBold', sans-serif; margin-top: 40px; margin-bottom: 20px; }}
             .section-title {{ margin-bottom: 5px; font-weight: bold; }}
             .section-content {{ margin-bottom: 20px; }}
             .recipient-date {{ display: flex; justify-content: space-between; margin-bottom: 20px; }}

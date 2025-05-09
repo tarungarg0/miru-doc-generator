@@ -2,7 +2,6 @@ import streamlit as st
 from datetime import datetime
 from urllib.parse import unquote
 import base64
-from xhtml2pdf import pisa
 from io import BytesIO
 import os
 
@@ -79,8 +78,19 @@ if st.button("Generate PDF"):
 
     html_template = f"""<html><body><h1>{doc_type}</h1><table border='1'><thead><tr><th>HSN</th><th>Description</th><th>QTY</th><th>Unit</th><th>Rate</th><th>Amount</th></tr></thead><tbody>{item_rows}</tbody></table><p>Total: ₹{grand_total:,.2f}</p></body></html>"""
 
-    pdf_file = BytesIO()
-    pisa.CreatePDF(html_template, dest=pdf_file)
-    pdf_bytes = pdf_file.getvalue()
+    import requests
+    response = requests.post(
+        "https://api.pdfshift.io/v3/convert/pdf",
+        headers={
+            "X-API-Key": "sk_b043ae1f2d6f66581b3d6ccce3884a0f750967e3",
+            "Content-Type": "application/json"
+        },
+        json={
+            "source": html_template,
+            "sandbox": False
+        }
+    )
+    response.raise_for_status()
+    pdf_bytes = response.content
     filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"
     st.download_button("📥 Download PDF", data=pdf_bytes, file_name=filename)

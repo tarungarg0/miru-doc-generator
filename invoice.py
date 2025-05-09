@@ -103,21 +103,21 @@ if st.button("Generate & Download PDF"):
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
         <title>Invoice</title>
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 40px 70px; background-color: #fff; }}
+            body {{ font-family: 'Bebas Neue Pro Expanded', sans-serif; margin: 40px 70px; background-color: #fff; }}
             .container {{ width: 100%; padding: 20px; }}
             .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
             .company-details p {{ margin: 0; }}
-            .document-type {{ text-align: right; font-size: 1.8em; margin-top: 40px; margin-bottom: 20px; }}
+            .document-type {{ text-align: right; font-size: 24px; font-weight: bold; font-family: 'Bebas Neue Pro Expanded XBold', sans-serif; margin-top: 40px; margin-bottom: 20px; }}}
             .section-title {{ margin-bottom: 5px; font-weight: bold; }}
             .section-content {{ margin-bottom: 20px; }}
             .recipient-date {{ display: flex; justify-content: space-between; margin-bottom: 20px; }}
             table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
-            table, th, td {{ border: 1px solid #ccc; }}
+            table, th, td {{ border: 1px solid #ccc; font-family: 'Bebas Neue Pro Expanded', sans-serif; font-size: 14px; }}}
             th, td {{ padding: 10px; text-align: left; }}
             .total-section {{ display: flex; justify-content: flex-end; margin-top: 20px; }}
             .total-table {{ width: 50%; border-collapse: collapse; }}
-            .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; }}
-            .terms {{ font-size: 0.9em; }}
+            .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; font-size: 14px; font-family: 'Bebas Neue Pro Expanded XBold', sans-serif; }}}
+            .terms {{ font-size: 11px; font-family: 'Bebas Neue Pro', sans-serif; }}}
         </style>
     </head>
     <body>

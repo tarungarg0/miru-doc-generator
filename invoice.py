@@ -112,12 +112,12 @@ if st.button("Generate & Download PDF"):
             .section-content {{ margin-bottom: 20px; }}
             .recipient-date {{ display: flex; justify-content: space-between; margin-bottom: 20px; }}
             table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
-            table, th, td {{ border: 1px solid #ccc; font-family: 'Bebas Neue Pro Expanded', sans-serif; font-size: 14px; }}}
+            table, th, td {{ border: 1px solid #ccc; font-family: 'Bebas Neue Pro Expanded', sans-serif; font-size: 14px; }}
             th, td {{ padding: 10px; text-align: left; }}
             .total-section {{ display: flex; justify-content: flex-end; margin-top: 20px; }}
             .total-table {{ width: 50%; border-collapse: collapse; }}
-            .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; font-size: 14px; font-family: 'Bebas Neue Pro Expanded XBold', sans-serif; }}}
-            .terms {{ font-size: 11px; font-family: 'Bebas Neue Pro', sans-serif; }}}
+            .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; font-size: 14px; font-family: 'Bebas Neue Pro Expanded XBold', sans-serif; }}
+            .terms {{ font-size: 11px; font-family: 'Bebas Neue Pro', sans-serif; }}
         </style>
     </head>
     <body>

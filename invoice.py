@@ -7,11 +7,9 @@ import os
 import requests
 
 # Load embedded fonts
-with open("/mnt/data/Bebas-Neue-Pro-Expanded-Bold-BF66cf3d77b066f.ttf", "rb") as f:
-    bold_font_base64 = base64.b64encode(f.read()).decode("utf-8")
-with open("/mnt/data/Bebas-Neue-Pro-Expanded-ExtraBold-BF66cf3d793166e.ttf", "rb") as f:
-    extrabold_font_base64 = base64.b64encode(f.read()).decode("utf-8")
-with open("/mnt/data/Bebas-Neue-Pro-Expanded.ttf", "rb") as f:
+bold_font_base64 = "AAEAAAASAQAABAAgR0RFRrRCsIIAA..."
+extrabold_font_base64 = "AAEAAAASAQAABAAgR0RFRjZApW..."
+regular_font_base64 = "AAEAAAARAQAABAA...""/mnt/data/Bebas-Neue-Pro-Expanded.ttf", "rb") as f:
     regular_font_base64 = base64.b64encode(f.read()).decode("utf-8")
 
 # Load and encode logo

@@ -104,14 +104,20 @@ if st.button("Generate & Download PDF"):
         <title>Invoice</title>
         @font-face {
   font-family: 'Bebas Neue Pro Expanded';
-  src: url(data:font/truetype;charset=utf-8;base64,{{bold_font}}) format('truetype');
+  src: url(data:font/truetype;charset=utf-8;base64,AAEAAAASAQAABAAgR0RFRrRCsIIAA...) format('truetype');
   font-weight: normal;
 }
 
 @font-face {
   font-family: 'Bebas Neue Pro Expanded XBold';
-  src: url(data:font/truetype;charset=utf-8;base64,{{extrabold_font}}) format('truetype');
+  src: url(data:font/truetype;charset=utf-8;base64,AAEAAAASAQAABAAgR0RFRjZApW...) format('truetype');
   font-weight: bold;
+}
+
+@font-face {
+  font-family: 'Bebas Neue Pro Regular';
+  src: url(data:font/truetype;charset=utf-8;base64,AAEAAAARAQAABAA...) format('truetype');
+  font-weight: normal;
 }
 
             body {{ font-family: 'Bebas Neue Pro Expanded', sans-serif; margin: 40px 70px; background-color: #fff; }}
@@ -138,8 +144,7 @@ if st.button("Generate & Download PDF"):
                 <div class=\"company-details\">
                     <p><strong>A Brand of RMT GREEN BUILDERS</strong></p>
                     <p>GST: 08AAJCM6422D1ZN</p>
-                    <p>Phone: +91 9310519154 </p>
-                    <p> Mail : contact@mirugrc.com</p>
+                    <p>Phone: +91 9310519154 | Mail : contact@mirugrc.com</p>
                 </div>
             </div>
             <div class=\"document-type\"><strong>{doc_type}</strong></div>

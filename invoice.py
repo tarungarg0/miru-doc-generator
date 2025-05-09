@@ -6,6 +6,14 @@ from io import BytesIO
 import os
 import requests
 
+# Load embedded fonts
+with open("/mnt/data/Bebas-Neue-Pro-Expanded-Bold-BF66cf3d77b066f.ttf", "rb") as f:
+    bold_font_base64 = base64.b64encode(f.read()).decode("utf-8")
+with open("/mnt/data/Bebas-Neue-Pro-Expanded-ExtraBold-BF66cf3d793166e.ttf", "rb") as f:
+    extrabold_font_base64 = base64.b64encode(f.read()).decode("utf-8")
+with open("/mnt/data/Bebas-Neue-Pro-Expanded.ttf", "rb") as f:
+    regular_font_base64 = base64.b64encode(f.read()).decode("utf-8")
+
 # Load and encode logo
 def get_base64_image(image_path):
     with open(image_path, "rb") as img_file:
@@ -105,19 +113,19 @@ if st.button("Generate & Download PDF"):
 <style>
 @font-face {
   font-family: 'Bebas Neue Pro Expanded';
-  src: url(data:font/truetype;charset=utf-8;base64,AAEAAAASAQAABAAgR0RFRrRCsIIAA...) format('truetype');
+  src: url(data:font/truetype;charset=utf-8;base64,{bold_font_base64}) format('truetype');
   font-weight: normal;
 }
 
 @font-face {
   font-family: 'Bebas Neue Pro Expanded XBold';
-  src: url(data:font/truetype;charset=utf-8;base64,AAEAAAASAQAABAAgR0RFRjZApW...) format('truetype');
+  src: url(data:font/truetype;charset=utf-8;base64,{extrabold_font_base64}) format('truetype');
   font-weight: bold;
 }
 
 @font-face {
   font-family: 'Bebas Neue Pro Regular';
-  src: url(data:font/truetype;charset=utf-8;base64,AAEAAAARAQAABAA...) format('truetype');
+  src: url(data:font/truetype;charset=utf-8;base64,{regular_font_base64}) format('truetype');
   font-weight: normal;
 }
 

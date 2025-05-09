@@ -102,7 +102,8 @@ if st.button("Generate & Download PDF"):
         <meta charset=\"UTF-8\">
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
         <title>Invoice</title>
-        @font-face {
+<style>
+@font-face {
   font-family: 'Bebas Neue Pro Expanded';
   src: url(data:font/truetype;charset=utf-8;base64,AAEAAAASAQAABAAgR0RFRrRCsIIAA...) format('truetype');
   font-weight: normal;

@@ -156,7 +156,7 @@ if st.button("Generate PDF"):
                     <div class=\"section-content\">{invoice_date}</div>
                 </div>
             </div>
-            <div class=\"delivery-info\">
+            <div class=\"delivery-info\" style=\"margin-bottom: 60px;\">
                 <div class=\"section-title\">Delivery Address</div>
                 <div class=\"section-content\">{delivery_address}</div>
             </div>
@@ -175,7 +175,7 @@ if st.button("Generate PDF"):
                     <tr><th><strong>Total (Round off):</strong></th><td><strong>₹{grand_total:,.2f}</strong></td></tr>
                 </table>
             </div>
-            <div class=\"terms\">
+            <div class=\"terms\" style=\"margin-top: 100px;\">
                 <div class=\"section-title\">Terms</div>
                 <div class=\"section-content\">
                     {''.join([f'<p>{i+1}. {t}</p>' for i, t in enumerate(terms)])}

@@ -110,7 +110,81 @@ if st.button("Generate PDF"):
 
     logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:60px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
 
-    html_template = f"""<html><body><h1>{doc_type}</h1><table border='1'><thead><tr><th>HSN</th><th>Description</th><th>QTY</th><th>Unit</th><th>Rate</th><th>Amount</th></tr></thead><tbody>{item_rows}</tbody></table><p>Total: ₹{grand_total:,.2f}</p></body></html>"""
+    html_template = f"""
+    <!DOCTYPE html>
+    <html lang=\"en\">
+    <head>
+        <meta charset=\"UTF-8\">
+        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+        <title>Invoice</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px 30px 20px 20px; background-color: #fff; }}
+            .container {{ width: 100%; padding: 20px; }}
+            .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
+            .company-details p {{ margin: 0; }}
+            .document-type {{ text-align: right; font-size: 1.2em; margin-bottom: 20px; }}
+            .section-title {{ margin-bottom: 5px; font-weight: bold; }}
+            .section-content {{ margin-bottom: 20px; }}
+            .recipient-date {{ display: flex; justify-content: space-between; margin-bottom: 20px; }}
+            table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
+            table, th, td {{ border: 1px solid #ccc; }}
+            th, td {{ padding: 10px; text-align: left; }}
+            .total-section {{ display: flex; justify-content: flex-end; margin-top: 20px; }}
+            .total-table {{ width: 50%; border-collapse: collapse; }}
+            .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; }}
+            .terms {{ font-size: 0.9em; }}
+        </style>
+    </head>
+    <body>
+        <div class=\"container\">
+            <div class=\"header\">
+                <div>{logo_html}</div>
+                <div class=\"company-details\">
+                    <p><strong>A Brand of RMT GREEN BUILDERS</strong></p>
+                    <p>GST: 08AAJCM6422D1ZN</p>
+                    <p>Phone: +91 9310519154 | Mail : contact@mirugrc.com</p>
+                </div>
+            </div>
+            <div class=\"document-type\"><strong>{doc_type}</strong></div>
+            <div class=\"recipient-date\">
+                <div>
+                    <div class=\"section-title\">Recipient</div>
+                    <div class=\"section-content\">{client_name}</div>
+                </div>
+                <div style=\"text-align: right;\">
+                    <div class=\"section-title\">Date</div>
+                    <div class=\"section-content\">{invoice_date}</div>
+                </div>
+            </div>
+            <div class=\"delivery-info\">
+                <div class=\"section-title\">Delivery Address</div>
+                <div class=\"section-content\">{delivery_address}</div>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>HSN</th><th>Description</th><th>QTY</th><th>Unit</th><th>Rate</th><th>Amount</th></tr>
+                </thead>
+                <tbody>{item_rows}</tbody>
+            </table>
+            <div class=\"total-section\">
+                <table class=\"total-table\">
+                    <tr><th>Subtotal:</th><td>₹{total:,.2f}</td></tr>
+                    <tr><th>CGST:</th><td>₹{total*0.09:,.2f}</td></tr>
+                    <tr><th>SGST:</th><td>₹{total*0.09:,.2f}</td></tr>
+                    <tr><th>Transportation:</th><td>{transport_included}</td></tr>
+                    <tr><th><strong>Total (Round off):</strong></th><td><strong>₹{grand_total:,.2f}</strong></td></tr>
+                </table>
+            </div>
+            <div class=\"terms\">
+                <div class=\"section-title\">Terms</div>
+                <div class=\"section-content\">
+                    {''.join([f'<p>{i+1}. {t}</p>' for i, t in enumerate(terms)])}
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
     import requests
     response = requests.post(

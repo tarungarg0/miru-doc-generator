@@ -139,7 +139,7 @@ if st.button("Generate PDF"):
         <div class=\"container\">
             <div class=\"header\">
                 <div>{logo_html}</div>
-                <div class=\"company-details\">
+                <div class=\"company-details\" style=\"text-align: left;\">
                     <p><strong>A Brand of RMT GREEN BUILDERS</strong></p>
                     <p>GST: 08AAJCM6422D1ZN</p>
                     <p>Phone: +91 9310519154 </p>

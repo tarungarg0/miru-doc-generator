@@ -140,9 +140,9 @@ if st.button("Generate PDF"):
             <div class=\"header\">
                 <div>{logo_html}</div>
                 <div class=\"company-details\" style=\"text-align: left;\">
-                    <p><strong>A Brand of RMT GREEN BUILDERS</strong></p>
-                    <p>GST: 08AAJCM6422D1ZN</p>
-                    <p>Phone: +91 9310519154 </p>
+                    <p><strong>MIXD STUDIO BY RMT</strong></p>
+                    <p>GST : 07ACDFM6440P1ZS</p>
+                    <p>+91 9799228313 , +91 9310519154</p>
                     <p>Mail : contact@mirugrc.com</p>
                 </div>
             </div>

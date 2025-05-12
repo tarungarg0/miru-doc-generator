@@ -147,7 +147,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
             <div class=\"header\" style=\"margin-bottom: 40px;\">
                 <div>{logo_html}</div>
                 <div class=\"company-details\" style=\"text-align: right;\">
-                    <p><strong style=\"font-family: 'Bebas Neue', sans-serif; font-size: 16px;\">MIXD STUDIO BY RMT</strong></p>
+                    <p><strong style=\"font-family: 'Bebas Neue', sans-serif; font-size: 24px;\">MIXD STUDIO BY RMT</strong></p>
                     <p style=\"font-size: 13px;\">GST: 07ACDFM6440P1ZS</p>
                     <p style=\"font-size: 13px;\">Phone: +91 9310519154 </p>
                     <p style=\"font-size: 13px;\">Mail : contact@mirugrc.com </p>

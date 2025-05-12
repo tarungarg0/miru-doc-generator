@@ -101,8 +101,14 @@ for i in range(item_count):
     items.append({"hsn": hsn, "desc": desc, "qty": qty, "unit": unit, "rate": rate})
 
 if st.button("Generate PDF"):
+    import streamlit.components.v1 as components
     item_rows = "".join([
         f"<tr><td>{item['hsn']}</td><td>{item['desc']}</td><td>{item['qty']}</td><td>{item['unit']}</td><td>₹{item['rate']}</td><td>₹{item['qty'] * item['rate']:,.2f}</td></tr>"
+        for item in items
+    ])
+    components.html(html_template, height=1000, scrolling=True)
+
+            f"<tr><td>{item['hsn']}</td><td>{item['desc']}</td><td>{item['qty']}</td><td>{item['unit']}</td><td>₹{item['rate']}</td><td>₹{item['qty'] * item['rate']:,.2f}</td></tr>"
         for item in items
     ])
     total = sum(item["qty"] * item["rate"] for item in items)

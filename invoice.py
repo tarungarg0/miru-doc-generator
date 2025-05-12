@@ -102,13 +102,12 @@ for i in range(item_count):
 
 if st.button("Generate PDF"):
     import streamlit.components.v1 as components
+    import streamlit.components.v1 as components
     item_rows = "".join([
         f"<tr><td>{item['hsn']}</td><td>{item['desc']}</td><td>{item['qty']}</td><td>{item['unit']}</td><td>₹{item['rate']}</td><td>₹{item['qty'] * item['rate']:,.2f}</td></tr>"
         for item in items
     ])
-    components.html(html_template, height=1000, scrolling=True)
-
-    item_rows = "".join([
+        item_rows = "".join([
         f"<tr><td>{item['hsn']}</td><td>{item['desc']}</td><td>{item['qty']}</td><td>{item['unit']}</td><td>₹{item['rate']}</td><td>₹{item['qty'] * item['rate']:,.2f}</td></tr>"
         for item in items
     ])
@@ -195,8 +194,7 @@ if st.button("Generate PDF"):
 
     import requests
 import streamlit.components.v1 as components
-import streamlit.components.v1 as components
-    components.html(html_template, height=1000, scrolling=True)
+    components.html(html_template, height=1000, scrolling=True)  # Live preview
 
     response = requests.post(
         "https://api.pdfshift.io/v3/convert/pdf",

@@ -183,7 +183,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
                     <tr><th><strong>Total (Round off):</strong></th><td><strong>₹{grand_total:,.2f}</strong></td></tr>
                 </table>
             </div>
-            <div class=\"terms\" style=\"margin-top: 100px;\">
+            <div class=\"terms\" style=\"margin-top: 100px; font-size: 11px;\">
                 <div class=\"section-title\">Terms</div>
                 <div class=\"section-content\">
                     {''.join([f'<p>{i+1}. {t}</p>' for i, t in enumerate(terms)])}

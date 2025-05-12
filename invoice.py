@@ -147,7 +147,7 @@ if st.button("Generate PDF"):
                     <p>Phone: +91 9310519154 | Mail : contact@mirugrc.com</p>
                 </div>
             </div>
-            <div class=\"document-type\"><strong>{doc_type}</strong></div>
+            <div class=\"document-type\" style=\"margin-top: 60px;\"><strong>{doc_type}</strong></div>
             <div class=\"recipient-date\" style=\"margin-bottom: 40px;\">
                 <div>
                     <div class=\"section-title\">Recipient</div>

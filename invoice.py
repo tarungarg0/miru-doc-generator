@@ -137,17 +137,16 @@ if st.button("Generate PDF"):
     </head>
     <body>
         <div class=\"container\">
-            <div class=\"header\">
+            <div class=\"header\" style=\"margin-bottom: 40px;\">
                 <div>{logo_html}</div>
-                <div class=\"company-details\" style=\"text-align: left;\">
-                    <p><strong>MIXD STUDIO BY RMT</strong></p>
-                    <p>GST : 07ACDFM6440P1ZS</p>
-                    <p>+91 9799228313 , +91 9310519154</p>
-                    <p>Mail : contact@mirugrc.com</p>
+                <div class=\"company-details\" style=\"text-align: right;\">
+                    <p><strong>A Brand of RMT GREEN BUILDERS</strong></p>
+                    <p>GST: 08AAJCM6422D1ZN</p>
+                    <p>Phone: +91 9310519154 | Mail : contact@mirugrc.com</p>
                 </div>
             </div>
             <div class=\"document-type\"><strong>{doc_type}</strong></div>
-            <div class=\"recipient-date\">
+            <div class=\"recipient-date\" style=\"margin-bottom: 40px;\">
                 <div>
                     <div class=\"section-title\">Recipient</div>
                     <div class=\"section-content\">{client_name}</div>
@@ -188,6 +187,9 @@ if st.button("Generate PDF"):
     """
 
     import requests
+import streamlit.components.v1 as components
+    components.html(html_template, height=1000, scrolling=True)
+
     response = requests.post(
         "https://api.pdfshift.io/v3/convert/pdf",
         headers={

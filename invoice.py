@@ -110,7 +110,7 @@ if st.button("Generate PDF"):
     total = sum(item["qty"] * item["rate"] for item in items)
     grand_total = round(total * 1.18)
 
-    logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:60px;'>" if logo_base64 else "<strong>[Logo Missing]</strong>"
+    logo_html = f"<img src='data:image/png;base64,{logo_base64}' style='height:60px;'>" if logo_base64 else "<strong style=\"font-family: 'Bebas Neue', sans-serif;\">[Logo Missing]</strong>"
 
     html_template = f"""
     <!DOCTYPE html>
@@ -121,7 +121,9 @@ if st.button("Generate PDF"):
         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
         <title>Invoice</title>
         <style>
-            body {{ font-family: 'Poppins', sans-serif; margin: 0; padding: 20px 30px 20px 20px; background-color: #fff; }}
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
+
+            body {{ font-family: 'Poppins', sans-serif; margin: 20mm 20mm 20mm 20mm; background-color: #fff; }}
             .container {{ width: 100%; padding: 20px; }}
             .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
             .company-details p {{ margin: 0; }}
@@ -154,7 +156,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
             <div class=\"document-type\" style=\"margin-top: 60px; font-size: 24px;\"><strong>{doc_type}</strong></div>
             <div class=\"recipient-date\" style=\"margin-bottom: 40px;\">
                 <div>
-                    <div class=\"section-title\">Recipient</div>
+                    <div class=\"section-title\">RECIPIENT</div>
                     <div class=\"section-content\">{client_name}</div>
                 </div>
                 <div style=\"text-align: right;\">

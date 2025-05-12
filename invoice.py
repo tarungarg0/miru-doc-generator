@@ -130,11 +130,13 @@ if st.button("Generate PDF"):
             .section-content {{ margin-bottom: 20px; }}
             .recipient-date {{ display: flex; justify-content: space-between; margin-bottom: 20px; }}
             table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
-            table, th, td {{ border: 1px solid #ccc; }}
+            table {{ border: 1px solid #ccc; }}
+th {{ border: 1px solid #ccc; font-size: 14px; }}
+td {{ border: 1px solid #ccc; font-size: 12px; }}
             th, td {{ padding: 10px; text-align: left; }}
             .total-section {{ display: flex; justify-content: flex-end; margin-top: 20px; }}
             .total-table {{ width: 50%; border-collapse: collapse; }}
-            .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; }}
+            .total-table th, .total-table td { border: 1px solid #ccc; padding: 10px; text-align: right; font-size: 11px; }}
             .terms {{ font-size: 0.9em; }}
         </style>
     </head>
@@ -161,12 +163,12 @@ if st.button("Generate PDF"):
                 </div>
             </div>
             <div class=\"delivery-info\" style=\"margin-bottom: 60px;\">
-                <div class=\"section-title\">Delivery Address</div>
+                <div class=\"section-title\">DELIVERY ADDRESS</div>
                 <div class=\"section-content\">{delivery_address}</div>
             </div>
             <table>
                 <thead>
-                    <tr><th>HSN</th><th>Description</th><th>QTY</th><th>Unit</th><th>Rate</th><th>Amount</th></tr>
+                    <tr><th>HSN</th><th>DESCRIPTION</th><th>QTY</th><th>UNIT</th><th>RATE</th><th>AMOUNT</th></tr>
                 </thead>
                 <tbody>{item_rows}</tbody>
             </table>

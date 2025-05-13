@@ -47,6 +47,7 @@ client_name = st.text_input("Client Name", value=client_name_q)
 billing_address = st.text_area("Billing Address", value=billing_address_q)
 delivery_address = st.text_area("Delivery Address", value=delivery_address_q)
 invoice_date = st.date_input("Invoice Date", value=datetime.today())
+project_name = st.text_input("Project Name")
 
 terms_templates = {
     "Standard": [

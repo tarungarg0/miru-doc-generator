@@ -156,21 +156,21 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
             <div class=\"document-type\" style=\"margin-top: 60px; font-size: 24px;\"><strong>{doc_type}</strong></div>
             <div class=\"recipient-date\" style=\"margin-bottom: 40px;\">
                 <div>
-                    <div class=\"section-title\"><strong style= font-size: 24px;\">RECIPIENT</strong></div>
-                    <div class=\"section-content\">{client_name}</div>
+                    <div class=\"section-title\" style=\"font-family: 'Bebas Neue', sans-serif;\">RECIPIENT</div>
+                    <div class=\"section-content\">{client_name}<br>{billing_address}</div>
                 </div>
                 <div style=\"text-align: right;\">
-                    <div class=\"section-title\">Date</div>
+                    <div class=\"section-title\" style=\"font-family: 'Bebas Neue', sans-serif;\">DATE</div>
                     <div class=\"section-content\">{invoice_date}</div>
                 </div>
             </div>
             <div class=\"delivery-info\" style=\"margin-bottom: 60px;\">
-                <div class=\"section-title\">DELIVERY ADDRESS</div>
-                <div class=\"section-content\">{delivery_address}</div>
+                <div class=\"section-title\" style=\"font-family: 'Bebas Neue', sans-serif;\">DELIVERY ADDRESS</div>
+                <div class=\"section-content\">{project_name}<br>{delivery_address}</div>
             </div>
             <table>
                 <thead>
-                    <tr><th>HSN</th><th>DESCRIPTION</th><th>QTY</th><th>UNIT</th><th>RATE</th><th>AMOUNT</th></tr>
+                    <tr><th style=\"font-family: 'Bebas Neue', sans-serif;\">HSN</th><th>DESCRIPTION</th><th>QTY</th><th>UNIT</th><th>RATE</th><th>AMOUNT</th></tr>
                 </thead>
                 <tbody>{item_rows}</tbody>
             </table>

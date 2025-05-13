@@ -39,11 +39,12 @@ query_params = st.query_params
 client_name_q = unquote("".join(query_params.get("client", [""])))
 billing_address_q = unquote("".join(query_params.get("billing", [""])))
 delivery_address_q = unquote("".join(query_params.get("address", [""])))
+project_name_q = unquote("".join(query_params.get("project", [""])))
 qty_q = query_params.get("qty", [""])[0]
 rate_q = query_params.get("rate", [""])[0]
 
 doc_type = st.selectbox("Document Type", ["Invoice", "Proforma Invoice", "Quotation"])
-project_name = st.text_input("Project Name")
+project_name = st.text_input("Project Name", value=project_name_q)
 client_name = st.text_input("Client Name", value=client_name_q)
 billing_address = st.text_area("Billing Address", value=billing_address_q)
 delivery_address = st.text_area("Delivery Address", value=delivery_address_q)

@@ -43,12 +43,10 @@ qty_q = query_params.get("qty", [""])[0]
 rate_q = query_params.get("rate", [""])[0]
 
 doc_type = st.selectbox("Document Type", ["Invoice", "Proforma Invoice", "Quotation"])
-project_name = st.text_input("Project Name")
 client_name = st.text_input("Client Name", value=client_name_q)
 billing_address = st.text_area("Billing Address", value=billing_address_q)
 delivery_address = st.text_area("Delivery Address", value=delivery_address_q)
 invoice_date = st.date_input("Invoice Date", value=datetime.today())
-project_name = st.text_input("Project Name")
 
 terms_templates = {
     "Standard": [

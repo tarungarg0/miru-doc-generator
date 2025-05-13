@@ -156,7 +156,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
             <div class=\"document-type\" style=\"margin-top: 60px; font-size: 24px;\"><strong>{doc_type}</strong></div>
             <div class=\"recipient-date\" style=\"margin-bottom: 40px;\">
                 <div>
-                    <div class=\"section-title\"><strong style=\"font-family: 'Bebas Neue', sans-serif; font-size: 24px;\">RECIPIENT</strong></div>
+                    <div class=\"section-title\"><strong style= font-size: 24px;\">RECIPIENT</strong></div>
                     <div class=\"section-content\">{client_name}</div>
                 </div>
                 <div style=\"text-align: right;\">

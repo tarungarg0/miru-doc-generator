@@ -160,7 +160,6 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
             .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; font-size: 11px; }}
           .terms {{ 
     font-size: 11px;
-    margin-top: 10px;
     page-break-inside: avoid;
     padding-bottom: 20mm;
 }}

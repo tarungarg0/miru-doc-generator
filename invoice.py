@@ -161,8 +161,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
           .terms {{ 
     font-size: 11px;
     margin-top: 10px;
-    page-break-before: always;
-    padding-top: 10mm;
+    page-break-inside: avoid;
     padding-bottom: 20mm;
 }}
         </style>

@@ -101,7 +101,24 @@ for i in range(item_count):
     rate_default = float(rate_q) if i == 0 and rate_q else 0
     rate = st.number_input(f"Rate {i+1}", key=f"rate_{i}", value=rate_default)
     items.append({"hsn": hsn, "desc": desc, "qty": qty, "unit": unit, "rate": rate})
-
+    
+def format_inr(amount):
+    try:
+        amount = float(amount)
+        s = f"{amount:,.2f}"
+        parts = s.split(".")
+        integer = parts[0].replace(",", "")
+        decimal = parts[1]
+        if len(integer) > 3:
+            last3 = integer[-3:]
+            rest = integer[:-3]
+            rest = ",".join([rest[max(i - 2, 0):i] for i in range(len(rest), 0, -2)][::-1])
+            return f"{rest},{last3}.{decimal}"
+        else:
+            return f"{integer}.{decimal}"
+    except:
+        return amount
+        
 if st.button("Generate PDF"):
     import streamlit.components.v1 as components
     

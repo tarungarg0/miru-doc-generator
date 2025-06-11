@@ -145,8 +145,8 @@ if st.button("Generate PDF"):
   margin: 20mm 20mm 20mm 20mm;
 }}
 
-            body {{ font-family: 'Poppins', sans-serif; margin: 10mm 20mm 20mm 20mm; background-color: #fff; }}
-            .container {{ width: 100%; padding: 20px; }}
+            body {{ font-family: 'Poppins', sans-serif; background-color: #fff; }}
+            .container {{ width: 100%}}
             .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }}
             .company-details p {{ margin: 0; }}
             .document-type {{ text-align: right; font-size: 1.2em; margin-bottom: 20px; }}

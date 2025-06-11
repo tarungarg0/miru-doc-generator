@@ -142,7 +142,7 @@ if st.button("Generate PDF"):
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
 
-            body {{ font-family: 'Poppins', sans-serif; margin: 20mm 20mm 20mm 20mm; background-color: #fff; }}
+            body { font-family: 'Poppins', sans-serif; margin: 10mm 20mm 20mm 20mm; background-color: #fff; }}
             .container {{ width: 100%; padding: 20px; }}
             .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
             .company-details p {{ margin: 0; }}

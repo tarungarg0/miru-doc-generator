@@ -158,7 +158,14 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
             .total-section {{ display: flex; justify-content: flex-end; margin-top: 20px; }}
             .total-table {{ width: 50%; border-collapse: collapse; }}
             .total-table th, .total-table td {{ border: 1px solid #ccc; padding: 10px; text-align: right; font-size: 11px; }}
-            .terms {{ font-size: 0.9em; }}
+            .terms {{  }}
+            .terms {
+    font-size: 0.9em;
+    margin-top: 100px;
+    page-break-before: always;
+    padding-top: 30mm;
+    padding-bottom: 20mm;
+}
         </style>
     </head>
     <body>

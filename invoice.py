@@ -178,7 +178,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
             </table>
             <div class=\"total-section\">
                 <table class=\"total-table\">
-                    <tr><th>Subtotal:</th><td>₹{total:,.2f}</td></tr>
+                    <tr><th>Subtotal:</th><td>₹{format(total, ',.2f').replace(',', '_').replace('_', ',', 1).replace('_', ',')}</td></tr>
                     <tr><th>CGST:</th><td>₹{total*0.09:,.2f}</td></tr>
                     <tr><th>SGST:</th><td>₹{total*0.09:,.2f}</td></tr>
                     <tr><th>Transportation:</th><td>{transport_included}</td></tr>

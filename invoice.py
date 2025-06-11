@@ -159,7 +159,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
             <div class=\"recipient-date\" style=\"margin-bottom: 40px;\">
                 <div>
                     <div class=\"section-title\" style=\"font-family: 'Bebas Neue', sans-serif;\">RECIPIENT</div>
-                    <div class=\"section-content\" style=\"font-size: 13px; word-wrap: break-word;\">{project_name}<br>{client_name}<br>{billing_address}</div>
+                    <div class=\"section-content\" style=\"font-size: 13px; word-wrap: break-word; word-break: break-word; white-space: pre-wrap; max-width: 300px;\">{project_name}<br>{client_name}<br>{billing_address}</div>
                 </div>
                 <div style=\"text-align: right;\">
                     <div class=\"section-title\" style=\"font-family: 'Bebas Neue', sans-serif;\">DATE</div>

@@ -168,7 +168,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
             </div>
             <div class=\"delivery-info\" style=\"margin-bottom: 60px;\">
                 <div class=\"section-title\" style=\"font-family: 'Bebas Neue', sans-serif;\">DELIVERY ADDRESS</div>
-                <div class=\"section-content\" style=\"font-size: 13px; word-wrap: break-word;\">{delivery_address}</div>
+                <div class=\"section-content\" style=\"font-size: 13px; word-wrap: break-word; word-break: break-word; white-space: pre-wrap; max-width: 300px;\">{delivery_address}</div>
             </div>
             <table>
                 <thead>

@@ -141,9 +141,9 @@ if st.button("Generate PDF"):
         <title>Invoice</title>
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
-        @page {
+        @page {{
   margin: 20mm 20mm 20mm 20mm;
-}
+}}
 
             body {{ font-family: 'Poppins', sans-serif; margin: 10mm 20mm 20mm 20mm; background-color: #fff; }}
             .container {{ width: 100%; padding: 20px; }}

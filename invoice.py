@@ -131,7 +131,7 @@ if st.button("Generate PDF"):
     grand_total = round(total * 1.18)
 
     logo_html = (
-    f"<img src='data:image/png;base64,{logo_base64}' style='height:40px;'>"
+    f"<img src='data:image/png;base64,{logo_base64}' style='height:50px;'>"
     if logo_base64 else
     "<strong style=\"font-family: 'Bebas Neue', sans-serif;\">[Logo Missing]</strong>"
 )
@@ -241,6 +241,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
     pdf_bytes = response.content
     filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"
     st.download_button("📥 Download PDF", data=pdf_bytes, file_name=filename)
+
 
 
 

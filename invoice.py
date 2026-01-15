@@ -6,12 +6,12 @@ from io import BytesIO
 import os
 
 # Load and encode logo
-def get_base64_image(image_path):
-    with open(image_path, "rb") as img_file:
-        return base64.b64encode(img_file.read()).decode('utf-8')
+def get_svg_content(svg_path):
+    with open(svg_path, "r", encoding="utf-8") as file:
+        return file.read()
 
-logo_path = "MIRU GRC _INDIAS FASTEST GROWING BRAND_Black.png"
-logo_base64 = get_base64_image(logo_path) if os.path.exists(logo_path) else None
+logo_svg_path = "MIRU GRC _INDIAS FASTEST GROWING BRAND.svg"
+logo_svg_content = get_svg_content(logo_svg_path) if os.path.exists(logo_svg_path) else None
 
 st.markdown("""
     <h2 style='text-align: center; font-family: Bebas Neue Pro Expanded;'>MIRU Document Generator</h2>
@@ -169,7 +169,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
     <body>
         <div class=\"container\">
             <div class=\"header\" style=\"margin-bottom: 40px;\">
-                <div>{logo_html}</div>
+                <div>{logo_html}</div> 
                 <div class=\"company-details\" style=\"text-align: right;\">
                     <p><strong , sans-serif; font-size: 24px;\">MIXD STUDIO BY RMT</strong></p>
                     <p style=\"font-size: 13px;\">GST: 07ACDFM6440P1ZS</p>
@@ -237,6 +237,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
     pdf_bytes = response.content
     filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"
     st.download_button("📥 Download PDF", data=pdf_bytes, file_name=filename)
+
 
 
 

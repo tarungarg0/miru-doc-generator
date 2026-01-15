@@ -180,21 +180,21 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
             <div class=\"document-type\" style=\"margin-top: 60px; font-size: 24px;\"><strong>{doc_type}</strong></div>
             <div class=\"recipient-date\" style=\"margin-bottom: 40px;\">
                 <div>
-                    <div class=\"section-title\" style=\"font-family: 'Bebas Neue', sans-serif;\">RECIPIENT</div>
+                    <div class=\"section-title\" style=\"font-family: 'Bebas Neue Pro Expanded', sans-serif;\">RECIPIENT</div>
                     <div class=\"section-content\" style=\"font-size: 13px; word-wrap: break-word; word-break: break-word; white-space: pre-wrap; max-width: 300px;\">{project_name}<br>{client_name}<br>{billing_address}</div>
                 </div>
                 <div style=\"text-align: right;\">
-                    <div class=\"section-title\" style=\"font-family: 'Bebas Neue', sans-serif;\">DATE</div>
+                    <div class=\"section-title\" style=\"font-family: 'Bebas Neue Pro Expanded', sans-serif;\">DATE</div>
                     <div class=\"section-content\">{invoice_date}</div>
                 </div>
             </div>
             <div class=\"delivery-info\" style=\"margin-bottom: 60px;\">
-                <div class=\"section-title\" style=\"font-family: 'Bebas Neue', sans-serif;\">DELIVERY ADDRESS</div>
+                <div class=\"section-title\" style=\"font-family: 'Bebas Neue Pro Expanded', sans-serif;\">DELIVERY ADDRESS</div>
                 <div class=\"section-content\" style=\"font-size: 13px; word-wrap: break-word; word-break: break-word; white-space: pre-wrap; max-width: 300px;\">{delivery_address}</div>
             </div>
             <table>
                 <thead>
-                    <tr><th style=\"font-family: 'Bebas Neue', sans-serif;\">HSN</th><th>DESCRIPTION</th><th>QTY</th><th>UNIT</th><th>RATE</th><th>AMOUNT</th></tr>
+                    <tr><th style=\"font-family: 'Bebas Neue Pro Expanded', sans-serif;\">HSN</th><th>DESCRIPTION</th><th>QTY</th><th>UNIT</th><th>RATE</th><th>AMOUNT</th></tr>
                 </thead>
                 <tbody>{item_rows}</tbody>
             </table>
@@ -237,4 +237,5 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
     pdf_bytes = response.content
     filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"
     st.download_button("📥 Download PDF", data=pdf_bytes, file_name=filename)
+
 

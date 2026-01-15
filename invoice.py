@@ -10,7 +10,7 @@ def get_svg_content(svg_path):
     with open(svg_path, "r", encoding="utf-8") as file:
         return file.read()
 
-logo_svg_path = "MIRU GRC _INDIAS FASTEST GROWING BRAND.svg"
+logo_svg_path = "MIRU_GRC_fixed.svg"
 logo_svg_content = get_svg_content(logo_svg_path) if os.path.exists(logo_svg_path) else None
 
 
@@ -130,7 +130,7 @@ if st.button("Generate PDF"):
     total = sum(item["qty"] * item["rate"] for item in items)
     grand_total = round(total * 1.18)
 
-    logo_html = f"<div style='height: 60px;'>{logo_svg_content}</div>" if logo_svg_content else "<strong style=\"font-family: 'Bebas Neue', sans-serif;\">[Logo Missing]</strong>"
+   logo_html = f"<div style='height: 60px;'>{logo_svg_content}</div>"
 
     html_template = f"""
     <!DOCTYPE html>
@@ -238,6 +238,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
     pdf_bytes = response.content
     filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"
     st.download_button("📥 Download PDF", data=pdf_bytes, file_name=filename)
+
 
 
 

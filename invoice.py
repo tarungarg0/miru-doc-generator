@@ -130,9 +130,9 @@ if st.button("Generate PDF"):
     total = sum(item["qty"] * item["rate"] for item in items)
     grand_total = round(total * 1.18)
 
-logo_html = f"<div style='height: 60px;'>{logo_svg_content}</div>"
+    logo_html = f"<div style='height: 60px;'>{logo_svg_content}</div>"
 
-html_template = f"""
+    html_template = f"""
     <!DOCTYPE html>
     <html lang=\"en\">
     <head>
@@ -238,6 +238,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
     pdf_bytes = response.content
     filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"
     st.download_button("📥 Download PDF", data=pdf_bytes, file_name=filename)
+
 
 
 

@@ -6,12 +6,12 @@ from io import BytesIO
 import os
 
 # Load and embed SVG logo as HTML string
-def get_svg_content(svg_path):
-    with open(svg_path, "r", encoding="utf-8") as file:
-        return file.read()
+def get_base64_image(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode("utf-8")
 
-logo_svg_path = "MIRU_GRC_fixed.svg"
-logo_svg_content = get_svg_content(logo_svg_path) if os.path.exists(logo_svg_path) else None
+logo_path = "MIRU GRC _INDIAS FASTEST GROWING BRAND_Black.png"  # Replace with your latest PNG logo
+logo_base64 = get_base64_image(logo_path) if os.path.exists(logo_path) else None
 
 
 st.markdown("""
@@ -130,8 +130,11 @@ if st.button("Generate PDF"):
     total = sum(item["qty"] * item["rate"] for item in items)
     grand_total = round(total * 1.18)
 
-    logo_html = f"<div style='height: 60px;'>{logo_svg_content}</div>"
-
+    logo_html = (
+    f"<img src='data:image/png;base64,{logo_base64}' style='height:60px;'>"
+    if logo_base64 else
+    "<strong style=\"font-family: 'Bebas Neue', sans-serif;\">[Logo Missing]</strong>"
+)
     html_template = f"""
     <!DOCTYPE html>
     <html lang=\"en\">
@@ -238,6 +241,7 @@ td {{ border: 1px solid #ccc; font-size: 12px; }}
     pdf_bytes = response.content
     filename = f"{doc_type}_{client_name.replace(' ', '_')}.pdf"
     st.download_button("📥 Download PDF", data=pdf_bytes, file_name=filename)
+
 
 
 

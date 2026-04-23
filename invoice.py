@@ -805,17 +805,22 @@ def doc_form(prefill=None):
             ms_sfx       = "m"
             caption_text = ""
 
-        existing = [
-            {
-                "hsn":       "",
-                "desc":      it.get("description", ""),
-                "qty":       float(it.get("qty", 0)),
-                "unit":      it.get("unit", ""),
-                "rate":      round(float(it.get("rate", 0)) * rate_pct, 2),
-                "sale_type": doc_sale_type,
+        existing = []
+        for it in wo_loaded["items"]:
+            base        = float(it.get("rate", 0))
+            s_rate      = float(it.get("supply_rate", base))
+            i_rate      = float(it.get("installation_rate", 0))
+            row = {
+                "hsn":         "",
+                "desc":        it.get("description", ""),
+                "qty":         float(it.get("qty", 0)),
+                "unit":        it.get("unit", ""),
+                "rate":        round(base * rate_pct, 2),
+                "supply_rate": round(s_rate * rate_pct, 2),
+                "install_rate": round(i_rate * rate_pct, 2),
+                "sale_type":   doc_sale_type,
             }
-            for it in wo_loaded["items"]
-        ]
+            existing.append(row)
         if caption_text:
             st.caption(caption_text)
     else:
@@ -1043,51 +1048,54 @@ def work_orders_tab():
         wo_status  = st.selectbox("Status", ["Active", "Completed", "On Hold"],
                                   index=["Active","Completed","On Hold"].index(ew["status"]) if ew and ew.get("status") in ["Active","Completed","On Hold"] else 0)
 
-        # Work order items — quick table
+        # Work order items — enter directly, auto-sync to Items catalog on save
         st.markdown("**Items & Rates**")
-        catalog   = get_items()
-        cat_map   = {f"{it['item_code']} — {it['description']}": it for it in catalog}
-        ex_items  = ew["items"] if ew else []
+        st.caption("Enter items directly here — they will be automatically added to the Items catalog when you save.")
+        ex_items = ew["items"] if ew else []
 
         wo_item_count = st.number_input("Number of items", 1, 30, value=max(1, len(ex_items)), step=1, key="wo_ic")
-        wo_items  = []
+        wo_items = []
 
-        # Header row
-        hc1, hc2, hc3, hc4, hc5 = st.columns([3, 1, 1, 1, 1])
-        hc1.markdown("**Description**"); hc2.markdown("**Unit**")
-        hc3.markdown("**Qty**"); hc4.markdown("**Rate ₹**"); hc5.markdown("**Value**")
+        # Column headers
+        h0, h1, h2, h3, h4, h5, h6 = st.columns([3, 1, 1, 1, 1, 1, 1])
+        h0.markdown("**Description**")
+        h1.markdown("**Unit**")
+        h2.markdown("**Qty**")
+        h3.markdown("**Supply Rate ₹**")
+        h4.markdown("**Install Rate ₹**")
+        h5.markdown("**Total Rate ₹**")
+        h6.markdown("**Contract Value**")
 
         for i in range(int(wo_item_count)):
             ei = ex_items[i] if i < len(ex_items) else {}
-            c0, c1, c2, c3, c4 = st.columns([3, 1, 1, 1, 1])
+            c0, c1, c2, c3, c4, c5, c6 = st.columns([3, 1, 1, 1, 1, 1, 1])
 
-            # Catalog quick-pick inline
-            if catalog:
-                cat_options = ["— manual —"] + list(cat_map.keys())
-                # Try to pre-select catalog entry matching saved description
-                saved_desc = ei.get("description", "")
-                default_cat_idx = next(
-                    (j+1 for j, k in enumerate(cat_map.keys()) if cat_map[k]["description"] == saved_desc), 0
-                )
-                cat_sel = c0.selectbox("", cat_options, index=default_cat_idx, key=f"wo_cat_{i}", label_visibility="collapsed")
-                cat_it  = cat_map.get(cat_sel)
-            else:
-                cat_it = None
-
-            w_desc = c0.text_input("", value=cat_it["description"] if cat_it else ei.get("description",""),
+            w_desc = c0.text_input("", value=ei.get("description", ""),
                                    key=f"wo_desc_{i}", label_visibility="collapsed",
-                                   placeholder="Item description")
-            w_unit_opts = ["RFT","SQFT","SQM","PC","KG"]
-            def_unit = cat_it["unit"] if cat_it else ei.get("unit","SQFT")
+                                   placeholder="e.g. GFRC RB-COL-2524")
+            w_unit_opts = ["SQFT", "RFT", "SQM", "PC", "KG"]
+            def_unit = ei.get("unit", "SQFT")
             w_unit = c1.selectbox("", w_unit_opts,
-                                  index=w_unit_opts.index(def_unit) if def_unit in w_unit_opts else 1,
+                                  index=w_unit_opts.index(def_unit) if def_unit in w_unit_opts else 0,
                                   key=f"wo_unit_{i}", label_visibility="collapsed")
-            w_qty  = c2.number_input("", value=float(ei.get("qty", 0)), min_value=0.0,
-                                     key=f"wo_qty_{i}", label_visibility="collapsed")
-            w_rate = c3.number_input("", value=float(cat_it["base_rate"]) if cat_it else float(ei.get("rate",0)),
-                                     min_value=0.0, key=f"wo_rate_{i}", label_visibility="collapsed")
-            c4.markdown(f"**₹{format_inr(w_qty * w_rate)}**")
-            wo_items.append({"description": w_desc, "unit": w_unit, "qty": w_qty, "rate": w_rate})
+            w_qty        = c2.number_input("", value=float(ei.get("qty", 0)), min_value=0.0,
+                                           key=f"wo_qty_{i}", label_visibility="collapsed")
+            w_supply_rate = c3.number_input("", value=float(ei.get("supply_rate", ei.get("rate", 0))),
+                                            min_value=0.0, key=f"wo_srate_{i}", label_visibility="collapsed")
+            w_install_rate = c4.number_input("", value=float(ei.get("installation_rate", 0)),
+                                             min_value=0.0, key=f"wo_irate_{i}", label_visibility="collapsed")
+            w_total_rate = w_supply_rate + w_install_rate
+            c5.markdown(f"**₹{format_inr(w_total_rate)}**")
+            c6.markdown(f"₹{format_inr(w_qty * w_total_rate)}")
+
+            wo_items.append({
+                "description":      w_desc,
+                "unit":             w_unit,
+                "qty":              w_qty,
+                "rate":             w_total_rate,
+                "supply_rate":      w_supply_rate,
+                "installation_rate": w_install_rate,
+            })
 
         # Payment milestones
         st.markdown("**Payment Milestones**")
@@ -1125,12 +1133,40 @@ def work_orders_tab():
         st.metric("Total Contract Value", f"₹{format_inr(total_contract)}")
 
         if st.button("💾 Save Work Order", type="primary"):
+            # Save the work order
             save_work_order({"wo_id": wo_id, "client_name": wo_client, "project_name": wo_project,
                              "scope": wo_scope, "items": wo_items, "milestones": milestones,
                              "terms": wo_terms, "status": wo_status,
                              "created_at": ew["created_at"] if ew else datetime.now().isoformat()},
                             edit_id=ew["wo_id"] if ew else None)
-            st.success(f"Work Order **{wo_id}** saved.")
+
+            # Auto-sync items to the Items catalog (upsert by description)
+            existing_catalog = get_items()
+            existing_descs   = {it["description"]: (i, it) for i, it in enumerate(existing_catalog)}
+            synced = 0
+            for it in wo_items:
+                if not it["description"].strip():
+                    continue
+                # Auto item_code: first 3 chars of desc (uppercase, no spaces) + sequential
+                code_base = it["description"].replace(" ", "")[:6].upper()
+                item_data = {
+                    "item_code":        code_base,
+                    "description":      it["description"],
+                    "unit":             it["unit"],
+                    "base_rate":        it["rate"],
+                    "supply_rate":      it["supply_rate"],
+                    "installation_rate": it["installation_rate"],
+                    "category":         wo_project,
+                    "sale_types":       json.dumps(["Supply", "Installation", "Supply & Installation"]),
+                }
+                if it["description"] in existing_descs:
+                    idx, _ = existing_descs[it["description"]]
+                    save_item(item_data, edit_idx=idx)
+                else:
+                    save_item(item_data)
+                synced += 1
+
+            st.success(f"Work Order **{wo_id}** saved. {synced} item(s) synced to catalog.")
             st.rerun()
 
     # List all WOs

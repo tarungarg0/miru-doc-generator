@@ -636,60 +636,41 @@ def doc_form(prefill=None):
             total_value = sum(float(it["qty"]) * float(it["rate"]) for it in wo_loaded["items"])
             all_ms      = wo_loaded["milestones"]
 
-            def _cumulative_pct(sel_orig_idx):
-                return sum(float(m["percent"]) for j, m in enumerate(all_ms) if j <= sel_orig_idx)
+            # Look up the 3 fixed milestones by name
+            def _ms(name):
+                return next((m for m in all_ms if m.get("name","").lower() == name.lower()),
+                            {"name": name, "percent": 0, "status": "Pending"})
 
-            def _is_install_ms(m):
-                return "install" in m["name"].lower()
+            adv_m = _ms("Advance")
+            sup_m = _ms("Supply")
+            ins_m = _ms("Installation")
 
-            if doc_sale_type == "Supply & Installation":
-                # No milestone needed — bill 100%
+            adv_pct = float(adv_m["percent"])
+            sup_pct = float(sup_m["percent"])
+            ins_pct = float(ins_m["percent"])
+
+            if doc_sale_type == "Supply":
+                # Advance already received — bill Advance + Supply cumulative
+                rate_pct       = (adv_pct + sup_pct) / 100
+                billing_amount = total_value * rate_pct
+                st.info(
+                    f"💰 **Billing Amount:** ₹{format_inr(billing_amount)}\n\n"
+                    f"Advance {adv_pct:.0f}% + Supply {sup_pct:.0f}% = **{adv_pct+sup_pct:.0f}%** of ₹{format_inr(total_value)}"
+                )
+            elif doc_sale_type == "Installation":
+                rate_pct       = ins_pct / 100
+                billing_amount = total_value * rate_pct
+                st.info(
+                    f"💰 **Billing Amount:** ₹{format_inr(billing_amount)}\n\n"
+                    f"Installation {ins_pct:.0f}% of ₹{format_inr(total_value)}"
+                )
+            else:  # Supply & Installation — 100%
+                rate_pct       = 1.0
                 billing_amount = total_value
-                st.info(f"💰 **Billing Amount:** ₹{format_inr(billing_amount)} (100% — Full Supply & Installation)")
-                billing_override = billing_amount
+                st.info(f"💰 **Billing Amount:** ₹{format_inr(billing_amount)} (100% — Supply & Installation)")
 
-            else:
-                # Filter pending milestones by sale type
-                pending_all = [(i, m) for i, m in enumerate(all_ms) if m["status"] == "Pending"]
-                if doc_sale_type == "Installation":
-                    pending_ms = [(i, m) for i, m in pending_all if _is_install_ms(m)] or pending_all
-                else:  # Supply
-                    pending_ms = [(i, m) for i, m in pending_all if not _is_install_ms(m)] or pending_all
-
-                if not pending_ms:
-                    st.warning("All milestones have been billed for this work order.")
-                else:
-                    if doc_sale_type == "Supply":
-                        ms_options = [
-                            f"{m['name']} — {m['percent']}% (Cumulative: {_cumulative_pct(i):.0f}%) = ₹{format_inr(total_value * _cumulative_pct(i) / 100)}"
-                            for i, m in pending_ms
-                        ]
-                    else:  # Installation
-                        ms_options = [
-                            f"{m['name']} — {m['percent']}% = ₹{format_inr(total_value * float(m['percent']) / 100)}"
-                            for i, m in pending_ms
-                        ]
-
-                    ms_sel = st.selectbox("Select Milestone to Bill", ms_options, key=f"ms_sel_{uid}_{doc_sale_type}")
-                    ms_idx_in_pending  = ms_options.index(ms_sel)
-                    selected_milestone = pending_ms[ms_idx_in_pending]
-                    sel_orig_idx       = selected_milestone[0]
-
-                    if doc_sale_type == "Supply":
-                        cumulative_pct = _cumulative_pct(sel_orig_idx)
-                        billing_amount = total_value * cumulative_pct / 100
-                        breakdown_parts = [
-                            f"{float(m['percent']):.0f}% ({m['name']}{'✓' if m['status']=='Billed' else ''})"
-                            for j, m in enumerate(all_ms) if j <= sel_orig_idx
-                        ]
-                        breakdown = " + ".join(breakdown_parts) + f" = {cumulative_pct:.0f}%"
-                        st.info(f"💰 **Billing Amount:** ₹{format_inr(billing_amount)}\n\n{breakdown} of ₹{format_inr(total_value)}")
-                    else:  # Installation
-                        own_pct        = float(selected_milestone[1]["percent"])
-                        billing_amount = total_value * own_pct / 100
-                        st.info(f"💰 **Billing Amount:** ₹{format_inr(billing_amount)} ({own_pct:.0f}% Installation of ₹{format_inr(total_value)})")
-
-                    billing_override = billing_amount
+            billing_override   = billing_amount
+            selected_milestone = None   # no longer used for selection
 
         st.markdown("---")
 
@@ -771,26 +752,15 @@ def doc_form(prefill=None):
 
     # ── Build existing items from WO or saved doc ──
     if wo_loaded and wo_loaded["items"]:
-        all_ms_r = wo_loaded["milestones"]
-
-        if doc_sale_type == "Supply & Installation":
-            rate_pct      = 1.0        # 100%
-            ms_sfx        = "si"
-            caption_text  = f"Items from {wo_loaded['wo_id']} — 100% (Supply & Installation)"
-        elif selected_milestone:
-            sel_idx  = selected_milestone[0]
-            own_pct  = float(selected_milestone[1]["percent"])
-            if doc_sale_type == "Supply":
-                rate_pct = sum(float(m["percent"]) for j, m in enumerate(all_ms_r) if j <= sel_idx) / 100
-                caption_text = f"Items from {wo_loaded['wo_id']} — {rate_pct*100:.0f}% cumulative (Supply)"
-            else:  # Installation
-                rate_pct = own_pct / 100
-                caption_text = f"Items from {wo_loaded['wo_id']} — {own_pct:.0f}% (Installation)"
-            ms_sfx = f"ms{sel_idx}"
+        # rate_pct already computed above in the WO milestone block
+        # (billing_override / total_value gives the same ratio)
+        ms_sfx = doc_sale_type.replace(" ", "").replace("&", "")
+        if doc_sale_type == "Supply":
+            caption_text = f"Items from {wo_loaded['wo_id']} — {rate_pct*100:.0f}% (Advance + Supply)"
+        elif doc_sale_type == "Installation":
+            caption_text = f"Items from {wo_loaded['wo_id']} — {rate_pct*100:.0f}% (Installation)"
         else:
-            rate_pct     = 1.0
-            ms_sfx       = "m"
-            caption_text = ""
+            caption_text = f"Items from {wo_loaded['wo_id']} — 100% (Supply & Installation)"
 
         existing = []
         for it in wo_loaded["items"]:
@@ -1152,25 +1122,40 @@ def work_orders_tab():
                 "installation_rate": w_install_rate,
             })
 
-        # Payment milestones
+        # Payment milestones — fixed 3: Advance, Supply, Installation
         st.markdown("**Payment Milestones**")
-        ex_ms   = ew["milestones"] if ew else []
-        ms_count = st.number_input("Number of milestones", 1, 10, value=max(3, len(ex_ms)), step=1, key="wo_ms_count")
-        milestones = []
-        total_pct  = 0
-        for i in range(int(ms_count)):
-            em = ex_ms[i] if i < len(ex_ms) else {}
-            mc1, mc2, mc3 = st.columns([3, 1, 1])
-            m_name   = mc1.text_input(f"Milestone {i+1} name", value=em.get("name",""), key=f"ms_name_{i}", placeholder="e.g. Advance / Before Dispatch")
-            m_pct    = mc2.number_input("% ", value=float(em.get("percent", 0)), min_value=0.0, max_value=100.0, key=f"ms_pct_{i}")
-            m_status = mc3.selectbox("", ["Pending","Billed","Received"], key=f"ms_st_{i}",
-                                     index=["Pending","Billed","Received"].index(em.get("status","Pending")))
-            milestones.append({"name": m_name, "percent": m_pct, "status": m_status})
-            total_pct += m_pct
-        if total_pct != 100:
-            st.warning(f"Milestones total: {total_pct}% (should be 100%)")
+        ex_ms = ew["milestones"] if ew else []
+
+        def _ms_val(name, field, default):
+            m = next((m for m in ex_ms if m.get("name","").lower() == name.lower()), {})
+            return m.get(field, default)
+
+        STATUSES = ["Pending", "Billed", "Received"]
+        mc1, mc2, mc3 = st.columns([3, 1, 1])
+        mc1.markdown("**Milestone**"); mc2.markdown("**%**"); mc3.markdown("**Status**")
+
+        adv_pct  = mc2.number_input("", value=float(_ms_val("Advance","percent",10)), min_value=0.0, max_value=100.0, key="ms_adv_pct", label_visibility="collapsed")
+        adv_st   = mc3.selectbox("", STATUSES, index=STATUSES.index(_ms_val("Advance","status","Pending")), key="ms_adv_st", label_visibility="collapsed")
+        mc1.markdown("Advance")
+
+        sup_pct  = mc2.number_input("", value=float(_ms_val("Supply","percent",75)), min_value=0.0, max_value=100.0, key="ms_sup_pct", label_visibility="collapsed")
+        sup_st   = mc3.selectbox("", STATUSES, index=STATUSES.index(_ms_val("Supply","status","Pending")), key="ms_sup_st", label_visibility="collapsed")
+        mc1.markdown("Supply")
+
+        ins_pct  = mc2.number_input("", value=float(_ms_val("Installation","percent",15)), min_value=0.0, max_value=100.0, key="ms_ins_pct", label_visibility="collapsed")
+        ins_st   = mc3.selectbox("", STATUSES, index=STATUSES.index(_ms_val("Installation","status","Pending")), key="ms_ins_st", label_visibility="collapsed")
+        mc1.markdown("Installation")
+
+        milestones = [
+            {"name": "Advance",      "percent": adv_pct, "status": adv_st},
+            {"name": "Supply",       "percent": sup_pct, "status": sup_st},
+            {"name": "Installation", "percent": ins_pct, "status": ins_st},
+        ]
+        total_pct = adv_pct + sup_pct + ins_pct
+        if round(total_pct, 2) != 100:
+            st.warning(f"Milestones total: {total_pct:.0f}% (should be 100%)")
         else:
-            st.success("✅ Milestones total 100%")
+            st.success(f"✅ Advance {adv_pct:.0f}% + Supply {sup_pct:.0f}% + Installation {ins_pct:.0f}% = 100%")
 
         # Terms & Conditions for this WO (auto-loaded into PIs)
         st.markdown("**Terms & Conditions** *(auto-loaded when this WO is selected in a PI)*")

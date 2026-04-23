@@ -39,6 +39,16 @@ TEMPLATE_HEADERS  = ["name", "terms_json"]
 MANAGER_HEADERS   = ["name", "whatsapp", "pin", "signature_b64"]
 CLIENT_HEADERS    = ["name", "billing_address", "delivery_address", "gst_number", "payment_terms", "notes"]
 ITEM_HEADERS      = ["item_code", "description", "unit", "base_rate", "category", "sale_types", "supply_rate", "installation_rate"]
+SETTINGS_HEADERS  = ["key", "value"]
+
+DEFAULT_BANK = {
+    "bank_name":    "Bank Name",
+    "account_name": "MIRU GRC",
+    "account_no":   "Account Number",
+    "ifsc":         "IFSC Code",
+    "branch":       "Branch",
+    "account_type": "Current",
+}
 
 @st.cache_resource
 def ensure_sheets():
@@ -101,6 +111,15 @@ def ensure_sheets():
         if ws.col_count < len(WO_HEADERS):
             ws.resize(cols=len(WO_HEADERS))
         ws.update("A1", [WO_HEADERS])
+
+    if "Settings" not in existing:
+        ws = sh.add_worksheet("Settings", 50, 2)
+        ws.update("A1", [SETTINGS_HEADERS])
+        # Seed default bank detail rows
+        for k, v in DEFAULT_BANK.items():
+            ws.append_row([k, v])
+    else:
+        sh.worksheet("Settings").update("A1", [SETTINGS_HEADERS])
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -215,6 +234,25 @@ def _fetch_items():
 @st.cache_data(ttl=60)
 def _fetch_work_orders():
     return get_sheet().worksheet("Work_Orders").get_all_records(expected_headers=WO_HEADERS)
+
+@st.cache_data(ttl=300)
+def _fetch_settings():
+    rows = get_sheet().worksheet("Settings").get_all_records(expected_headers=SETTINGS_HEADERS)
+    return {r["key"]: r["value"] for r in rows if r.get("key")}
+
+def get_settings():
+    return _fetch_settings()
+
+def save_settings(kv_dict):
+    ws   = get_sheet().worksheet("Settings")
+    rows = ws.get_all_records(expected_headers=SETTINGS_HEADERS)
+    key_to_row = {r["key"]: i + 2 for i, r in enumerate(rows)}
+    for k, v in kv_dict.items():
+        if k in key_to_row:
+            ws.update(f"B{key_to_row[k]}", [[v]])
+        else:
+            ws.append_row([k, v])
+    _fetch_settings.clear()
 
 def _bust():
     """Clear all data caches after any write."""
@@ -446,6 +484,22 @@ def build_html(data, signature_b64=None, watermark=False):
 
     terms_html = "".join(f"<p style='margin:3px 0'>{i+1}. {t}</p>" for i, t in enumerate(terms))
 
+    # Bank details
+    try:
+        bank = get_settings()
+    except Exception:
+        bank = {}
+    bank_html = f"""
+<table style='width:60%;border-collapse:collapse;font-size:11px;'>
+  <tr><td colspan='2' style='font-weight:700;padding:4px 0;border-bottom:1px solid #ccc;'>BANK DETAILS</td></tr>
+  <tr><td style='padding:2px 8px 2px 0;color:#555;width:40%'>Bank Name</td><td><b>{bank.get('bank_name', DEFAULT_BANK['bank_name'])}</b></td></tr>
+  <tr><td style='padding:2px 8px 2px 0;color:#555;'>Account Name</td><td><b>{bank.get('account_name', DEFAULT_BANK['account_name'])}</b></td></tr>
+  <tr><td style='padding:2px 8px 2px 0;color:#555;'>Account Number</td><td><b>{bank.get('account_no', DEFAULT_BANK['account_no'])}</b></td></tr>
+  <tr><td style='padding:2px 8px 2px 0;color:#555;'>IFSC Code</td><td><b>{bank.get('ifsc', DEFAULT_BANK['ifsc'])}</b></td></tr>
+  <tr><td style='padding:2px 8px 2px 0;color:#555;'>Branch</td><td>{bank.get('branch', DEFAULT_BANK['branch'])}</td></tr>
+  <tr><td style='padding:2px 8px 2px 0;color:#555;'>Account Type</td><td>{bank.get('account_type', DEFAULT_BANK['account_type'])}</td></tr>
+</table>"""
+
     return f"""<!DOCTYPE html>
 <html><head>
 <link href='https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap' rel='stylesheet'>
@@ -516,9 +570,12 @@ td{{font-size:11px;}}
   <b>Amount in Words:</b> Rupees {amount_in_words(grand)}
 </p>
 
-<div style='margin-top:30px;font-size:11px;'>
-  <p style='font-weight:600;margin-bottom:4px;'>TERMS &amp; CONDITIONS</p>
-  {terms_html}
+<div style='margin-top:24px;display:flex;gap:40px;align-items:flex-start;'>
+  <div style='flex:1'>{bank_html}</div>
+  <div style='flex:1;font-size:11px;'>
+    <p style='font-weight:700;margin-bottom:4px;border-bottom:1px solid #ccc;padding-bottom:4px;'>TERMS &amp; CONDITIONS</p>
+    {terms_html}
+  </div>
 </div>
 
 {sig_html}
@@ -1351,6 +1408,26 @@ def settings_tab():
                     _bust()
                     st.success(f"Signature saved for {chosen}.")
                     break
+
+    st.markdown("---")
+    st.subheader("🏦 Bank Details")
+    st.caption("These appear on every PDF. Edit and click Save.")
+    cfg = get_settings()
+    col_a, col_b = st.columns(2)
+    with col_a:
+        s_bank   = st.text_input("Bank Name",       value=cfg.get("bank_name",    DEFAULT_BANK["bank_name"]))
+        s_acname = st.text_input("Account Name",    value=cfg.get("account_name", DEFAULT_BANK["account_name"]))
+        s_acno   = st.text_input("Account Number",  value=cfg.get("account_no",   DEFAULT_BANK["account_no"]))
+    with col_b:
+        s_ifsc   = st.text_input("IFSC Code",       value=cfg.get("ifsc",         DEFAULT_BANK["ifsc"]))
+        s_branch = st.text_input("Branch",          value=cfg.get("branch",       DEFAULT_BANK["branch"]))
+        s_type   = st.text_input("Account Type",    value=cfg.get("account_type", DEFAULT_BANK["account_type"]))
+    if st.button("💾 Save Bank Details", type="primary"):
+        save_settings({
+            "bank_name": s_bank, "account_name": s_acname, "account_no": s_acno,
+            "ifsc": s_ifsc, "branch": s_branch, "account_type": s_type,
+        })
+        st.success("Bank details saved — will appear on all future PDFs.")
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 

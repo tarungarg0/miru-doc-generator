@@ -847,67 +847,95 @@ def doc_form(prefill=None):
     items = []
     hsn_options = ["68109990", "68109100", "69072100", "Other"]
 
+    # Track removed items in session state (reset when WO/milestone changes)
+    skip_key = f"skip_{uid}_{wk}"
+    if skip_key not in st.session_state:
+        st.session_state[skip_key] = set()
+
     for i in range(int(item_count)):
-        ei = existing[i] if i < len(existing) else {}
-        with st.expander(f"Item {i+1} — {ei.get('desc','')}" if ei.get("desc") else f"Item {i+1}", expanded=True):
-            # ── Catalog picker (optional override) ──
-            if catalog:
-                cat_sel  = st.selectbox("Override from catalog (optional)", ["— use WO / manual —"] + list(catalog_map.keys()), key=f"cat_{uid}_{wk}_{i}")
-                cat_item = catalog_map.get(cat_sel)
+        ei      = existing[i] if i < len(existing) else {}
+        skipped = i in st.session_state[skip_key]
+        label   = ei.get("desc", f"Item {i+1}")
+
+        c_btn, c_exp = st.columns([1, 15])
+
+        # Delete / restore button outside the expander so user never has to open it to remove
+        with c_btn:
+            st.write("")   # vertical alignment nudge
+            if skipped:
+                if st.button("↩️", key=f"restore_{uid}_{wk}_{i}", help="Restore item"):
+                    st.session_state[skip_key].discard(i)
+                    st.rerun()
             else:
-                cat_item = None
+                if st.button("🗑️", key=f"del_{uid}_{wk}_{i}", help="Remove from this bill"):
+                    st.session_state[skip_key].add(i)
+                    st.rerun()
 
-            # ── Description: from WO ei, or auto-built from catalog pick ──
-            if cat_item:
-                item_name = cat_item["description"]
-                if doc_sale_type == "Supply":
-                    auto_desc = f"Supply of {item_name}"
-                elif doc_sale_type == "Installation":
-                    auto_desc = f"Installation of {item_name}"
+        with c_exp:
+            exp_title = f"~~{label}~~ *(removed)*" if skipped else label
+            with st.expander(exp_title, expanded=False):
+                if skipped:
+                    st.caption("This item will NOT be included in the document. Click ↩️ to restore.")
+                    continue   # skip rendering all the widgets
+
+                # ── Catalog picker (optional override) ──
+                if catalog:
+                    cat_sel  = st.selectbox("Override from catalog (optional)", ["— use WO / manual —"] + list(catalog_map.keys()), key=f"cat_{uid}_{wk}_{i}")
+                    cat_item = catalog_map.get(cat_sel)
                 else:
-                    auto_desc = f"Supply & Installation of {item_name}"
-            else:
-                auto_desc = ei.get("desc", "")
+                    cat_item = None
 
-            ca, cb = st.columns(2)
-            with ca:
-                ei_hsn  = str(ei.get("hsn", ""))
-                hi      = hsn_options.index(ei_hsn) if ei_hsn in hsn_options else 3
-                hchoice = st.selectbox("HSN", hsn_options, index=hi, key=f"hc_{uid}_{wk}_{i}")
-                hsn     = st.text_input("HSN Code", value=ei_hsn if hchoice == "Other" else hchoice, key=f"hsn_{uid}_{wk}_{i}")
-                desc    = st.text_input("Description", value=auto_desc, key=f"desc_{uid}_{wk}_{i}")
-            with cb:
-                qty       = st.number_input("Quantity", value=float(ei.get("qty", 0)), key=f"qty_{uid}_{wk}_{i}", min_value=0.0)
-                unit_opts = ["RFT", "SQFT", "SQM", "PC", "KG"]
-                def_unit  = (cat_item["unit"] if cat_item else None) or ei.get("unit", "SQFT")
-                ui        = unit_opts.index(def_unit) if def_unit in unit_opts else 0
-                unit      = st.selectbox("Unit", unit_opts, index=ui, key=f"unit_{uid}_{wk}_{i}")
-
-                if doc_sale_type == "Supply & Installation":
-                    # Split rates — supply portion + installation portion
-                    sr_default   = float(cat_item.get("supply_rate", cat_item.get("base_rate", 0))) if cat_item else float(ei.get("supply_rate", ei.get("rate", 0)))
-                    ir_default   = float(cat_item.get("installation_rate", 0)) if cat_item else float(ei.get("install_rate", 0))
-                    supply_rate  = st.number_input("Supply Rate (₹)", value=float(ei.get("supply_rate", sr_default)), key=f"sr_{uid}_{wk}_{i}", min_value=0.0)
-                    install_rate = st.number_input("Installation Rate (₹)", value=float(ei.get("install_rate", ir_default)), key=f"ir_{uid}_{wk}_{i}", min_value=0.0)
-                    rate         = supply_rate
-                    st.caption(f"Supply: ₹{format_inr(qty*supply_rate)} | Install: ₹{format_inr(qty*install_rate)} | Total: ₹{format_inr(qty*(supply_rate+install_rate))}")
-                else:
-                    supply_rate  = None
-                    install_rate = None
-                    if cat_item:
-                        cat_rate_default = float(
-                            cat_item.get("supply_rate", cat_item["base_rate"]) if doc_sale_type == "Supply"
-                            else cat_item.get("installation_rate", cat_item["base_rate"])
-                        )
+                # ── Description ──
+                if cat_item:
+                    item_name = cat_item["description"]
+                    if doc_sale_type == "Supply":
+                        auto_desc = f"Supply of {item_name}"
+                    elif doc_sale_type == "Installation":
+                        auto_desc = f"Installation of {item_name}"
                     else:
-                        cat_rate_default = 0.0
-                    rate_default = float(ei.get("rate", 0)) if ei.get("rate") else cat_rate_default
-                    rate = st.number_input("Rate (₹)", value=rate_default, key=f"rate_{uid}_{wk}_{i}", min_value=0.0)
-                    st.caption(f"Amount: ₹{format_inr(qty * rate)}")
+                        auto_desc = f"Supply & Installation of {item_name}"
+                else:
+                    auto_desc = ei.get("desc", "")
 
-        items.append({"hsn": hsn, "desc": desc, "qty": qty, "unit": unit,
-                      "rate": rate, "sale_type": doc_sale_type,
-                      "supply_rate": supply_rate, "install_rate": install_rate})
+                ca, cb = st.columns(2)
+                with ca:
+                    ei_hsn  = str(ei.get("hsn", ""))
+                    hi      = hsn_options.index(ei_hsn) if ei_hsn in hsn_options else 3
+                    hchoice = st.selectbox("HSN", hsn_options, index=hi, key=f"hc_{uid}_{wk}_{i}")
+                    hsn     = st.text_input("HSN Code", value=ei_hsn if hchoice == "Other" else hchoice, key=f"hsn_{uid}_{wk}_{i}")
+                    desc    = st.text_input("Description", value=auto_desc, key=f"desc_{uid}_{wk}_{i}")
+                with cb:
+                    qty       = st.number_input("Quantity", value=float(ei.get("qty", 0)), key=f"qty_{uid}_{wk}_{i}", min_value=0.0)
+                    unit_opts = ["RFT", "SQFT", "SQM", "PC", "KG"]
+                    def_unit  = (cat_item["unit"] if cat_item else None) or ei.get("unit", "SQFT")
+                    ui        = unit_opts.index(def_unit) if def_unit in unit_opts else 0
+                    unit      = st.selectbox("Unit", unit_opts, index=ui, key=f"unit_{uid}_{wk}_{i}")
+
+                    if doc_sale_type == "Supply & Installation":
+                        sr_default   = float(cat_item.get("supply_rate", cat_item.get("base_rate", 0))) if cat_item else float(ei.get("supply_rate", ei.get("rate", 0)))
+                        ir_default   = float(cat_item.get("installation_rate", 0)) if cat_item else float(ei.get("install_rate", 0))
+                        supply_rate  = st.number_input("Supply Rate (₹)", value=float(ei.get("supply_rate", sr_default)), key=f"sr_{uid}_{wk}_{i}", min_value=0.0)
+                        install_rate = st.number_input("Installation Rate (₹)", value=float(ei.get("install_rate", ir_default)), key=f"ir_{uid}_{wk}_{i}", min_value=0.0)
+                        rate         = supply_rate
+                        st.caption(f"Supply: ₹{format_inr(qty*supply_rate)} | Install: ₹{format_inr(qty*install_rate)} | Total: ₹{format_inr(qty*(supply_rate+install_rate))}")
+                    else:
+                        supply_rate  = None
+                        install_rate = None
+                        if cat_item:
+                            cat_rate_default = float(
+                                cat_item.get("supply_rate", cat_item["base_rate"]) if doc_sale_type == "Supply"
+                                else cat_item.get("installation_rate", cat_item["base_rate"])
+                            )
+                        else:
+                            cat_rate_default = 0.0
+                        rate_default = float(ei.get("rate", 0)) if ei.get("rate") else cat_rate_default
+                        rate = st.number_input("Rate (₹)", value=rate_default, key=f"rate_{uid}_{wk}_{i}", min_value=0.0)
+                        st.caption(f"Amount: ₹{format_inr(qty * rate)}")
+
+        if not skipped:
+            items.append({"hsn": hsn, "desc": desc, "qty": qty, "unit": unit,
+                          "rate": rate, "sale_type": doc_sale_type,
+                          "supply_rate": supply_rate, "install_rate": install_rate})
 
     # ── Totals preview ──
     subtotal = sum(float(it["qty"]) * float(it["rate"]) for it in items)

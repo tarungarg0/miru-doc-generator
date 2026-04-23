@@ -78,9 +78,15 @@ def ensure_sheets():
         ws.append_row(["item_code", "description", "unit", "base_rate", "category", "sale_types", "supply_rate", "installation_rate"])
 
     if "Work_Orders" not in existing:
-        ws = sh.add_worksheet("Work_Orders", 500, 8)
+        ws = sh.add_worksheet("Work_Orders", 500, 9)
         ws.append_row(["wo_id", "client_name", "project_name", "scope",
-                       "items_json", "milestones_json", "created_at", "status"])
+                       "items_json", "milestones_json", "terms_json", "created_at", "status"])
+    else:
+        # Ensure terms_json column header exists (backward compat)
+        ws = sh.worksheet("Work_Orders")
+        headers = ws.row_values(1)
+        if "terms_json" not in headers:
+            ws.update_cell(1, len(headers) + 1, "terms_json")
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -271,7 +277,7 @@ def save_item(data, edit_idx=None):
 # ── Work Orders ────────────────────────────────────────────────────────────────
 
 WO_HEADERS = ["wo_id", "client_name", "project_name", "scope",
-              "items_json", "milestones_json", "created_at", "status"]
+              "items_json", "milestones_json", "terms_json", "created_at", "status"]
 
 def get_work_orders():
     records = _fetch_work_orders()
@@ -286,6 +292,10 @@ def get_work_orders():
             r["milestones"] = json.loads(r["milestones_json"])
         except Exception:
             r["milestones"] = []
+        try:
+            r["terms"] = json.loads(r.get("terms_json") or "[]")
+        except Exception:
+            r["terms"] = []
         result.append(r)
     return result
 
@@ -299,12 +309,13 @@ def save_work_order(data, edit_id=None):
     row = [
         data["wo_id"], data["client_name"], data["project_name"], data["scope"],
         json.dumps(data["items"]), json.dumps(data["milestones"]),
+        json.dumps(data.get("terms", [])),
         data.get("created_at", datetime.now().isoformat()), data.get("status", "Active"),
     ]
     if edit_id:
         for i, r in enumerate(_fetch_work_orders()):
             if r["wo_id"] == edit_id:
-                ws.update(f"A{i+2}:H{i+2}", [row])
+                ws.update(f"A{i+2}:I{i+2}", [row])
                 _bust()
                 return
     ws.append_row(row)
@@ -568,6 +579,16 @@ def doc_form(prefill=None):
     delivery_q = p.get("delivery_address") or unquote(qp.get("address", ""))
     project_q  = p.get("project_name")    or unquote(qp.get("project", ""))
 
+    # ── Type of Sale (document-level — drives milestone filter & rate logic) ──
+    ALL_SALE_TYPES = ["Supply", "Installation", "Supply & Installation"]
+    first_item_stype = (p.get("items") or [{}])[0].get("sale_type", ALL_SALE_TYPES[0])
+    prev_stype = first_item_stype if first_item_stype in ALL_SALE_TYPES else ALL_SALE_TYPES[0]
+    doc_sale_type = st.radio(
+        "Type of Sale", ALL_SALE_TYPES,
+        index=ALL_SALE_TYPES.index(prev_stype),
+        horizontal=True, key=f"doc_stype_{uid}"
+    )
+
     # ── Work Order quick-load ──
     wos = get_work_orders()
     active_wos = [w for w in wos if w.get("status") == "Active"]
@@ -582,38 +603,80 @@ def doc_form(prefill=None):
         wo_loaded = next((w for w in active_wos if f"{w['wo_id']} — {w['project_name']} ({w['client_name']})" == wo_sel), None)
 
         if wo_loaded:
-            total_value = sum(float(it["qty"]) * float(it["rate"]) for it in wo_loaded["items"])
-            pending_ms  = [(i, m) for i, m in enumerate(wo_loaded["milestones"]) if m["status"] == "Pending"]
-
-            if not pending_ms:
-                st.warning("All milestones have been billed for this work order.")
+            # ── Auto-load client details from WO ──
+            clients_all = get_clients()
+            wo_client_data = next((c for c in clients_all if c["name"] == wo_loaded["client_name"]), None)
+            if wo_client_data:
+                client_q   = wo_client_data["name"]
+                billing_q  = wo_client_data["billing_address"]
+                delivery_q = wo_client_data["delivery_address"]
             else:
-                all_ms = wo_loaded["milestones"]
+                client_q = wo_loaded["client_name"]
 
-                def _cumulative_pct(sel_orig_idx):
-                    """Sum percentages of all milestones from 0 up to and including sel_orig_idx."""
-                    return sum(float(m["percent"]) for j, m in enumerate(all_ms) if j <= sel_orig_idx)
+            # ── Auto-load terms from WO (only if not already set for this doc) ──
+            terms_key = f"active_terms_{uid}"
+            wo_terms  = wo_loaded.get("terms") or []
+            if wo_terms and terms_key not in st.session_state:
+                st.session_state[terms_key] = wo_terms
 
-                ms_options = [
-                    f"{m['name']} — {m['percent']}% (Cumulative: {_cumulative_pct(i):.0f}%) = ₹{format_inr(total_value * _cumulative_pct(i) / 100)}"
-                    for i, m in pending_ms
-                ]
-                ms_sel = st.selectbox("Select Milestone to Bill", ms_options, key=f"ms_sel_{uid}")
-                ms_idx_in_pending = ms_options.index(ms_sel)
-                selected_milestone = pending_ms[ms_idx_in_pending]
+            total_value = sum(float(it["qty"]) * float(it["rate"]) for it in wo_loaded["items"])
+            all_ms      = wo_loaded["milestones"]
 
-                sel_orig_idx   = selected_milestone[0]
-                cumulative_pct = _cumulative_pct(sel_orig_idx)
-                billing_amount = total_value * cumulative_pct / 100
+            def _cumulative_pct(sel_orig_idx):
+                return sum(float(m["percent"]) for j, m in enumerate(all_ms) if j <= sel_orig_idx)
 
-                # Build breakdown string  e.g. "10% (Advance✓) + 75% (Before Dispatch) = 85%"
-                breakdown_parts = [
-                    f"{float(m['percent']):.0f}% ({m['name']}{'✓' if m['status']=='Billed' else ''})"
-                    for j, m in enumerate(all_ms) if j <= sel_orig_idx
-                ]
-                breakdown = " + ".join(breakdown_parts) + f" = {cumulative_pct:.0f}%"
-                st.info(f"💰 **Billing Amount:** ₹{format_inr(billing_amount)}\n\n{breakdown} of ₹{format_inr(total_value)}")
+            def _is_install_ms(m):
+                return "install" in m["name"].lower()
+
+            if doc_sale_type == "Supply & Installation":
+                # No milestone needed — bill 100%
+                billing_amount = total_value
+                st.info(f"💰 **Billing Amount:** ₹{format_inr(billing_amount)} (100% — Full Supply & Installation)")
                 billing_override = billing_amount
+
+            else:
+                # Filter pending milestones by sale type
+                pending_all = [(i, m) for i, m in enumerate(all_ms) if m["status"] == "Pending"]
+                if doc_sale_type == "Installation":
+                    pending_ms = [(i, m) for i, m in pending_all if _is_install_ms(m)] or pending_all
+                else:  # Supply
+                    pending_ms = [(i, m) for i, m in pending_all if not _is_install_ms(m)] or pending_all
+
+                if not pending_ms:
+                    st.warning("All milestones have been billed for this work order.")
+                else:
+                    if doc_sale_type == "Supply":
+                        ms_options = [
+                            f"{m['name']} — {m['percent']}% (Cumulative: {_cumulative_pct(i):.0f}%) = ₹{format_inr(total_value * _cumulative_pct(i) / 100)}"
+                            for i, m in pending_ms
+                        ]
+                    else:  # Installation
+                        ms_options = [
+                            f"{m['name']} — {m['percent']}% = ₹{format_inr(total_value * float(m['percent']) / 100)}"
+                            for i, m in pending_ms
+                        ]
+
+                    ms_sel = st.selectbox("Select Milestone to Bill", ms_options, key=f"ms_sel_{uid}")
+                    ms_idx_in_pending  = ms_options.index(ms_sel)
+                    selected_milestone = pending_ms[ms_idx_in_pending]
+                    sel_orig_idx       = selected_milestone[0]
+
+                    if doc_sale_type == "Supply":
+                        cumulative_pct = _cumulative_pct(sel_orig_idx)
+                        billing_amount = total_value * cumulative_pct / 100
+                        breakdown_parts = [
+                            f"{float(m['percent']):.0f}% ({m['name']}{'✓' if m['status']=='Billed' else ''})"
+                            for j, m in enumerate(all_ms) if j <= sel_orig_idx
+                        ]
+                        breakdown = " + ".join(breakdown_parts) + f" = {cumulative_pct:.0f}%"
+                        st.info(f"💰 **Billing Amount:** ₹{format_inr(billing_amount)}\n\n{breakdown} of ₹{format_inr(total_value)}")
+                    else:  # Installation
+                        own_pct        = float(selected_milestone[1]["percent"])
+                        billing_amount = total_value * own_pct / 100
+                        st.info(f"💰 **Billing Amount:** ₹{format_inr(billing_amount)} ({own_pct:.0f}% Installation of ₹{format_inr(total_value)})")
+
+                    billing_override = billing_amount
+
         st.markdown("---")
 
     # ── Client quick-load ──
@@ -715,64 +778,49 @@ def doc_form(prefill=None):
     catalog = get_items()
     catalog_map = {f"{it['item_code']} — {it['description']}": it for it in catalog}
 
-    # If work order loaded, use its items and calculate billing rate based on sale type
-    if wo_loaded and selected_milestone and wo_loaded["items"]:
-        all_ms_for_rate    = wo_loaded["milestones"]
-        sel_orig_idx_rate  = selected_milestone[0]
-        # Cumulative % = all milestones up to & including selected (for Supply)
-        cum_pct            = sum(float(m["percent"]) for j, m in enumerate(all_ms_for_rate) if j <= sel_orig_idx_rate)
-        # Own % = only the selected milestone (for Installation)
-        own_pct            = float(selected_milestone[1]["percent"])
+    # ── Build existing items from WO or saved doc ──
+    if wo_loaded and wo_loaded["items"]:
+        all_ms_r = wo_loaded["milestones"]
 
-        def _wo_item_rate(it):
-            stype      = it.get("sale_type", "Supply")
-            base_rate  = float(it.get("rate", 0))
-            s_rate     = float(it.get("supply_rate", base_rate))
-            i_rate     = float(it.get("installation_rate", 0))
+        if doc_sale_type == "Supply & Installation":
+            rate_pct      = 1.0        # 100%
+            ms_sfx        = "si"
+            caption_text  = f"Items from {wo_loaded['wo_id']} — 100% (Supply & Installation)"
+        elif selected_milestone:
+            sel_idx  = selected_milestone[0]
+            own_pct  = float(selected_milestone[1]["percent"])
+            if doc_sale_type == "Supply":
+                rate_pct = sum(float(m["percent"]) for j, m in enumerate(all_ms_r) if j <= sel_idx) / 100
+                caption_text = f"Items from {wo_loaded['wo_id']} — {rate_pct*100:.0f}% cumulative (Supply)"
+            else:  # Installation
+                rate_pct = own_pct / 100
+                caption_text = f"Items from {wo_loaded['wo_id']} — {own_pct:.0f}% (Installation)"
+            ms_sfx = f"ms{sel_idx}"
+        else:
+            rate_pct     = 1.0
+            ms_sfx       = "m"
+            caption_text = ""
 
-            if stype == "Installation":
-                # Installation billed at just the selected milestone %
-                return round(base_rate * own_pct / 100, 2), None, None
-            elif stype == "Supply & Installation":
-                # Supply portion → cumulative %; Installation portion → own %
-                return (
-                    round(s_rate * cum_pct / 100, 2),   # supply_rate for this PI
-                    round(i_rate * own_pct / 100, 2),   # install_rate for this PI
-                    "Supply & Installation"
-                )
-            else:  # Supply (default)
-                return round(base_rate * cum_pct / 100, 2), None, None
-
-        existing = []
-        for it in wo_loaded["items"]:
-            r, ir, stype_override = _wo_item_rate(it)
-            row = {
-                "hsn":        "",
-                "desc":       it["description"],
-                "qty":        float(it["qty"]),
-                "unit":       it["unit"],
-                "rate":       r,
-                "sale_type":  stype_override or it.get("sale_type", "Supply"),
+        existing = [
+            {
+                "hsn":       "",
+                "desc":      it.get("description", ""),
+                "qty":       float(it.get("qty", 0)),
+                "unit":      it.get("unit", ""),
+                "rate":      round(float(it.get("rate", 0)) * rate_pct, 2),
+                "sale_type": doc_sale_type,
             }
-            if ir is not None:
-                row["supply_rate"]  = r
-                row["install_rate"] = ir
-            existing.append(row)
-
-        st.caption(
-            f"Items loaded from {wo_loaded['wo_id']} — "
-            f"Supply: {cum_pct:.0f}% cumulative | Installation: {own_pct:.0f}% (this milestone only)"
-        )
+            for it in wo_loaded["items"]
+        ]
+        if caption_text:
+            st.caption(caption_text)
     else:
         existing = p.get("items", [])
+        ms_sfx   = ""
 
     item_count = st.number_input("Number of items", 1, 20, value=max(1, len(existing)), step=1, key=f"ic_{uid}")
     items = []
     hsn_options = ["68109990", "68109100", "69072100", "Other"]
-
-    # When a WO milestone is selected, include its index in widget keys so
-    # Streamlit treats them as new widgets and picks up the recalculated rate.
-    ms_sfx = f"_ms{selected_milestone[0]}" if selected_milestone else ""
 
     for i in range(int(item_count)):
         ei = existing[i] if i < len(existing) else {}
@@ -784,27 +832,12 @@ def doc_form(prefill=None):
             else:
                 cat_item = None
 
-            # ── Type of Sale ──
-            ALL_SALE_TYPES = ["Supply", "Installation", "Supply & Installation"]
-            if cat_item:
-                try:
-                    allowed_types = json.loads(cat_item.get("sale_types", "[]")) or ALL_SALE_TYPES
-                except Exception:
-                    allowed_types = ALL_SALE_TYPES
-            else:
-                allowed_types = ALL_SALE_TYPES
-
-            prev_sale_type = ei.get("sale_type", allowed_types[0])
-            sale_type_idx  = allowed_types.index(prev_sale_type) if prev_sale_type in allowed_types else 0
-            sale_type = st.radio("Type of Sale", allowed_types, index=sale_type_idx,
-                                 horizontal=True, key=f"stype_{uid}_{i}")
-
-            # Auto-build description from sale type + item name
+            # ── Auto-build description from doc-level sale type + item name ──
             if cat_item:
                 item_name = cat_item["description"]
-                if sale_type == "Supply":
+                if doc_sale_type == "Supply":
                     auto_desc = f"Supply of {item_name}"
-                elif sale_type == "Installation":
+                elif doc_sale_type == "Installation":
                     auto_desc = f"Installation of {item_name}"
                 else:
                     auto_desc = f"Supply & Installation of {item_name}"
@@ -825,25 +858,30 @@ def doc_form(prefill=None):
                 ui        = unit_opts.index(def_unit) if def_unit in unit_opts else 0
                 unit      = st.selectbox("Unit", unit_opts, index=ui, key=f"unit_{uid}_{i}")
 
-                if sale_type == "Supply & Installation" and cat_item:
-                    # Show split rates
-                    sr_default  = float(cat_item.get("supply_rate", cat_item.get("base_rate", 0)))
-                    ir_default  = float(cat_item.get("installation_rate", 0))
-                    supply_rate = st.number_input("Supply Rate (₹)", value=float(ei.get("supply_rate", sr_default)), key=f"sr_{uid}_{ms_sfx}_{i}", min_value=0.0)
-                    install_rate= st.number_input("Installation Rate (₹)", value=float(ei.get("install_rate", ir_default)), key=f"ir_{uid}_{ms_sfx}_{i}", min_value=0.0)
-                    rate        = supply_rate  # stored on main row; install_rate stored separately
+                if doc_sale_type == "Supply & Installation":
+                    # Split rates — supply portion + installation portion
+                    sr_default   = float(cat_item.get("supply_rate", cat_item.get("base_rate", 0))) if cat_item else float(ei.get("supply_rate", ei.get("rate", 0)))
+                    ir_default   = float(cat_item.get("installation_rate", 0)) if cat_item else float(ei.get("install_rate", 0))
+                    supply_rate  = st.number_input("Supply Rate (₹)", value=float(ei.get("supply_rate", sr_default)), key=f"sr_{uid}_{ms_sfx}_{i}", min_value=0.0)
+                    install_rate = st.number_input("Installation Rate (₹)", value=float(ei.get("install_rate", ir_default)), key=f"ir_{uid}_{ms_sfx}_{i}", min_value=0.0)
+                    rate         = supply_rate
                     st.caption(f"Supply: ₹{format_inr(qty*supply_rate)} | Install: ₹{format_inr(qty*install_rate)} | Total: ₹{format_inr(qty*(supply_rate+install_rate))}")
                 else:
                     supply_rate  = None
                     install_rate = None
-                    rate_default = float(ei.get("rate", 0)) if ei.get("rate") else (
-                        float(cat_item.get("supply_rate", cat_item["base_rate"]) if sale_type == "Supply" else
-                              cat_item.get("installation_rate", cat_item["base_rate"])) if cat_item else 0.0)
+                    if cat_item:
+                        cat_rate_default = float(
+                            cat_item.get("supply_rate", cat_item["base_rate"]) if doc_sale_type == "Supply"
+                            else cat_item.get("installation_rate", cat_item["base_rate"])
+                        )
+                    else:
+                        cat_rate_default = 0.0
+                    rate_default = float(ei.get("rate", 0)) if ei.get("rate") else cat_rate_default
                     rate = st.number_input("Rate (₹)", value=rate_default, key=f"rate_{uid}_{ms_sfx}_{i}", min_value=0.0)
                     st.caption(f"Amount: ₹{format_inr(qty * rate)}")
 
         items.append({"hsn": hsn, "desc": desc, "qty": qty, "unit": unit,
-                      "rate": rate, "sale_type": sale_type,
+                      "rate": rate, "sale_type": doc_sale_type,
                       "supply_rate": supply_rate, "install_rate": install_rate})
 
     # ── Totals preview ──
@@ -1001,31 +1039,51 @@ def work_orders_tab():
         wo_status  = st.selectbox("Status", ["Active", "Completed", "On Hold"],
                                   index=["Active","Completed","On Hold"].index(ew["status"]) if ew and ew.get("status") in ["Active","Completed","On Hold"] else 0)
 
-        # Work order items
+        # Work order items — quick table
         st.markdown("**Items & Rates**")
         catalog   = get_items()
         cat_map   = {f"{it['item_code']} — {it['description']}": it for it in catalog}
         ex_items  = ew["items"] if ew else []
-        wo_item_count = st.number_input("Number of items", 1, 20, value=max(1, len(ex_items)), step=1, key="wo_ic")
+
+        wo_item_count = st.number_input("Number of items", 1, 30, value=max(1, len(ex_items)), step=1, key="wo_ic")
         wo_items  = []
+
+        # Header row
+        hc1, hc2, hc3, hc4, hc5 = st.columns([3, 1, 1, 1, 1])
+        hc1.markdown("**Description**"); hc2.markdown("**Unit**")
+        hc3.markdown("**Qty**"); hc4.markdown("**Rate ₹**"); hc5.markdown("**Value**")
+
         for i in range(int(wo_item_count)):
             ei = ex_items[i] if i < len(ex_items) else {}
-            with st.expander(f"WO Item {i+1}", expanded=True):
-                if catalog:
-                    cat_sel = st.selectbox("From catalog", ["— manual —"] + list(cat_map.keys()), key=f"wo_cat_{i}")
-                    cat_it  = cat_map.get(cat_sel)
-                else:
-                    cat_it = None
-                c1, c2, c3 = st.columns(3)
-                w_desc = c1.text_input("Description", value=cat_it["description"] if cat_it else ei.get("description",""), key=f"wo_desc_{i}")
-                w_unit_opts = ["RFT","SQFT","SQM","PC","KG"]
-                def_unit = cat_it["unit"] if cat_it else ei.get("unit","SQFT")
-                w_unit = c1.selectbox("Unit", w_unit_opts, index=w_unit_opts.index(def_unit) if def_unit in w_unit_opts else 1, key=f"wo_unit_{i}")
-                w_qty  = c2.number_input("Total Qty", value=float(ei.get("qty", 0)), min_value=0.0, key=f"wo_qty_{i}")
-                w_rate = c2.number_input("Agreed Rate (₹)", value=float(cat_it["base_rate"]) if cat_it else float(ei.get("rate",0)), min_value=0.0, key=f"wo_rate_{i}")
-                w_total = w_qty * w_rate
-                c3.metric("Contract Value", f"₹{format_inr(w_total)}")
-                wo_items.append({"description": w_desc, "unit": w_unit, "qty": w_qty, "rate": w_rate})
+            c0, c1, c2, c3, c4 = st.columns([3, 1, 1, 1, 1])
+
+            # Catalog quick-pick inline
+            if catalog:
+                cat_options = ["— manual —"] + list(cat_map.keys())
+                # Try to pre-select catalog entry matching saved description
+                saved_desc = ei.get("description", "")
+                default_cat_idx = next(
+                    (j+1 for j, k in enumerate(cat_map.keys()) if cat_map[k]["description"] == saved_desc), 0
+                )
+                cat_sel = c0.selectbox("", cat_options, index=default_cat_idx, key=f"wo_cat_{i}", label_visibility="collapsed")
+                cat_it  = cat_map.get(cat_sel)
+            else:
+                cat_it = None
+
+            w_desc = c0.text_input("", value=cat_it["description"] if cat_it else ei.get("description",""),
+                                   key=f"wo_desc_{i}", label_visibility="collapsed",
+                                   placeholder="Item description")
+            w_unit_opts = ["RFT","SQFT","SQM","PC","KG"]
+            def_unit = cat_it["unit"] if cat_it else ei.get("unit","SQFT")
+            w_unit = c1.selectbox("", w_unit_opts,
+                                  index=w_unit_opts.index(def_unit) if def_unit in w_unit_opts else 1,
+                                  key=f"wo_unit_{i}", label_visibility="collapsed")
+            w_qty  = c2.number_input("", value=float(ei.get("qty", 0)), min_value=0.0,
+                                     key=f"wo_qty_{i}", label_visibility="collapsed")
+            w_rate = c3.number_input("", value=float(cat_it["base_rate"]) if cat_it else float(ei.get("rate",0)),
+                                     min_value=0.0, key=f"wo_rate_{i}", label_visibility="collapsed")
+            c4.markdown(f"**₹{format_inr(w_qty * w_rate)}**")
+            wo_items.append({"description": w_desc, "unit": w_unit, "qty": w_qty, "rate": w_rate})
 
         # Payment milestones
         st.markdown("**Payment Milestones**")
@@ -1047,10 +1105,25 @@ def work_orders_tab():
         else:
             st.success("✅ Milestones total 100%")
 
+        # Terms & Conditions for this WO (auto-loaded into PIs)
+        st.markdown("**Terms & Conditions** *(auto-loaded when this WO is selected in a PI)*")
+        ex_wo_terms = ew["terms"] if ew else []
+        wo_term_count = st.number_input("Number of terms", 0, 15,
+                                        value=max(1, len(ex_wo_terms)), step=1, key="wo_tc")
+        wo_terms = [
+            st.text_input(f"Term {j+1}", value=ex_wo_terms[j] if j < len(ex_wo_terms) else "",
+                          key=f"wo_term_{j}")
+            for j in range(int(wo_term_count))
+        ]
+        wo_terms = [t for t in wo_terms if t.strip()]
+
+        total_contract = sum(it["qty"] * it["rate"] for it in wo_items)
+        st.metric("Total Contract Value", f"₹{format_inr(total_contract)}")
+
         if st.button("💾 Save Work Order", type="primary"):
             save_work_order({"wo_id": wo_id, "client_name": wo_client, "project_name": wo_project,
                              "scope": wo_scope, "items": wo_items, "milestones": milestones,
-                             "status": wo_status,
+                             "terms": wo_terms, "status": wo_status,
                              "created_at": ew["created_at"] if ew else datetime.now().isoformat()},
                             edit_id=ew["wo_id"] if ew else None)
             st.success(f"Work Order **{wo_id}** saved.")

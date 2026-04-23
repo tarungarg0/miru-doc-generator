@@ -35,6 +35,10 @@ DOC_HEADERS = [
     "transport", "transport_amount", "items_json", "terms_json", "created_at",
     "approval_token", "approved_by", "approved_at", "signature_b64", "notes", "doc_code",
 ]
+TEMPLATE_HEADERS  = ["name", "terms_json"]
+MANAGER_HEADERS   = ["name", "whatsapp", "pin", "signature_b64"]
+CLIENT_HEADERS    = ["name", "billing_address", "delivery_address", "gst_number", "payment_terms", "notes"]
+ITEM_HEADERS      = ["item_code", "description", "unit", "base_rate", "category", "sale_types", "supply_rate", "installation_rate"]
 
 @st.cache_resource
 def ensure_sheets():
@@ -51,7 +55,7 @@ def ensure_sheets():
 
     if "Terms_Templates" not in existing:
         ws = sh.add_worksheet("Terms_Templates", 100, 2)
-        ws.append_row(["name", "terms_json"])
+        ws.update("A1", [TEMPLATE_HEADERS])
         ws.append_row(["Standard", json.dumps([
             "Prices are exclusive of GST.",
             "Material will be delivered within 10-15 working days.",
@@ -64,33 +68,39 @@ def ensure_sheets():
             "Immediate invoicing after dispatch.",
             "Payment within 3 days of delivery.",
         ])])
+    else:
+        sh.worksheet("Terms_Templates").update("A1", [TEMPLATE_HEADERS])
 
     if "Managers" not in existing:
         ws = sh.add_worksheet("Managers", 20, 4)
-        ws.append_row(["name", "whatsapp", "pin", "signature_b64"])
+        ws.update("A1", [MANAGER_HEADERS])
+    else:
+        sh.worksheet("Managers").update("A1", [MANAGER_HEADERS])
 
     if "Clients" not in existing:
         ws = sh.add_worksheet("Clients", 500, 6)
-        ws.append_row(["name", "billing_address", "delivery_address", "gst_number", "payment_terms", "notes"])
+        ws.update("A1", [CLIENT_HEADERS])
+    else:
+        sh.worksheet("Clients").update("A1", [CLIENT_HEADERS])
 
     if "Items" not in existing:
-        ws = sh.add_worksheet("Items", 500, 5)
-        ws.append_row(["item_code", "description", "unit", "base_rate", "category", "sale_types", "supply_rate", "installation_rate"])
+        ws = sh.add_worksheet("Items", 500, len(ITEM_HEADERS))
+        ws.update("A1", [ITEM_HEADERS])
+    else:
+        ws = sh.worksheet("Items")
+        # Resize if needed (Items was originally created with 5 cols)
+        if ws.col_count < len(ITEM_HEADERS):
+            ws.resize(cols=len(ITEM_HEADERS))
+        ws.update("A1", [ITEM_HEADERS])
 
     if "Work_Orders" not in existing:
-        ws = sh.add_worksheet("Work_Orders", 500, 9)
-        ws.append_row(["wo_id", "client_name", "project_name", "scope",
-                       "items_json", "milestones_json", "terms_json", "created_at", "status"])
+        ws = sh.add_worksheet("Work_Orders", 500, len(WO_HEADERS))
+        ws.update("A1", [WO_HEADERS])
     else:
-        # Ensure terms_json column header exists (backward compat)
         ws = sh.worksheet("Work_Orders")
-        headers = ws.row_values(1)
-        if "terms_json" not in headers:
-            new_col = len(headers) + 1
-            # Resize sheet first if needed so new column fits
-            if ws.col_count < new_col:
-                ws.resize(cols=new_col)
-            ws.update_cell(1, new_col, "terms_json")
+        if ws.col_count < len(WO_HEADERS):
+            ws.resize(cols=len(WO_HEADERS))
+        ws.update("A1", [WO_HEADERS])
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -188,19 +198,19 @@ def _fetch_documents():
 
 @st.cache_data(ttl=60)
 def _fetch_templates():
-    return get_sheet().worksheet("Terms_Templates").get_all_records()
+    return get_sheet().worksheet("Terms_Templates").get_all_records(expected_headers=TEMPLATE_HEADERS)
 
 @st.cache_data(ttl=60)
 def _fetch_managers():
-    return get_sheet().worksheet("Managers").get_all_records()
+    return get_sheet().worksheet("Managers").get_all_records(expected_headers=MANAGER_HEADERS)
 
 @st.cache_data(ttl=60)
 def _fetch_clients():
-    return get_sheet().worksheet("Clients").get_all_records()
+    return get_sheet().worksheet("Clients").get_all_records(expected_headers=CLIENT_HEADERS)
 
 @st.cache_data(ttl=60)
 def _fetch_items():
-    return get_sheet().worksheet("Items").get_all_records()
+    return get_sheet().worksheet("Items").get_all_records(expected_headers=ITEM_HEADERS)
 
 @st.cache_data(ttl=60)
 def _fetch_work_orders():

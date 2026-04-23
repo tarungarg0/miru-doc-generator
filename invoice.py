@@ -380,27 +380,37 @@ def build_html(data, signature_b64=None, watermark=False):
     def _item_rows(items):
         html = ""
         for it in items:
-            qty = float(it.get("qty", 0))
+            qty         = float(it.get("qty", 0))
+            app         = float(it.get("area_per_piece", 0))
+            pcs         = float(it.get("pieces", 0))
+            # Show "X sqft × Y pcs = Z sqft" if area/pieces available, else just qty
+            if app > 0 and pcs > 0:
+                qty_cell = f"{app} × {pcs:.0f} = {format_inr(qty)}"
+            else:
+                qty_cell = format_inr(qty) if qty else "—"
+
+            unit = it.get("unit", "")
+
             if it.get("sale_type") == "Supply & Installation" and (it.get("supply_rate") or it.get("install_rate")):
                 sr = float(it.get("supply_rate") or 0)
                 ir = float(it.get("install_rate") or 0)
                 if sr:
                     html += (
                         f"<tr><td>Supply</td><td>{it.get('hsn','')}</td><td>Supply of {it['desc']}</td>"
-                        f"<td>{qty}</td><td>{it.get('unit','')}</td><td>₹{format_inr(sr)}</td>"
+                        f"<td>{qty_cell}</td><td>{unit}</td><td>₹{format_inr(sr)}</td>"
                         f"<td>₹{format_inr(qty * sr)}</td></tr>"
                     )
                 if ir:
                     html += (
                         f"<tr><td>Installation</td><td>{it.get('hsn','')}</td><td>Installation of {it['desc']}</td>"
-                        f"<td>{qty}</td><td>{it.get('unit','')}</td><td>₹{format_inr(ir)}</td>"
+                        f"<td>{qty_cell}</td><td>{unit}</td><td>₹{format_inr(ir)}</td>"
                         f"<td>₹{format_inr(qty * ir)}</td></tr>"
                     )
             else:
                 rate = float(it.get("rate", 0))
                 html += (
                     f"<tr><td>{it.get('sale_type','')}</td><td>{it.get('hsn','')}</td><td>{it['desc']}</td>"
-                    f"<td>{qty}</td><td>{it.get('unit','')}</td><td>₹{format_inr(rate)}</td>"
+                    f"<td>{qty_cell}</td><td>{unit}</td><td>₹{format_inr(rate)}</td>"
                     f"<td>₹{format_inr(qty * rate)}</td></tr>"
                 )
         return html
@@ -488,7 +498,7 @@ td{{font-size:11px;}}
 </div>
 
 <table>
-  <thead><tr><th>TYPE</th><th>HSN</th><th>DESCRIPTION</th><th>QTY</th><th>UNIT</th><th>RATE</th><th>AMOUNT</th></tr></thead>
+  <thead><tr><th>TYPE</th><th>HSN</th><th>DESCRIPTION</th><th>AREA/PC × PCS = QTY</th><th>UNIT</th><th>RATE</th><th>AMOUNT</th></tr></thead>
   <tbody>{rows}</tbody>
 </table>
 
@@ -1381,39 +1391,36 @@ def main():
 
         form_data = doc_form(prefill)
 
-        b1, b2, b3, b4 = st.columns(4)
+        b1, b2 = st.columns(2)
         with b1:
-            if st.button("💾 Save Draft", type="primary"):
+            if st.button("💾 Save Draft", type="primary", use_container_width=True):
                 doc_id = edit_id or generate_doc_id(form_data["doc_type"], form_data.get("doc_code", ""))
                 form_data["doc_id"] = doc_id
                 if prefill:
                     form_data["created_at"] = prefill.get("created_at", "")
                 save_document(form_data, edit_id=edit_id)
-                # Mark work order milestone as Billed
                 if form_data.get("wo_id") and form_data.get("wo_milestone_idx") is not None:
                     update_wo_milestone(form_data["wo_id"], form_data["wo_milestone_idx"], "Billed")
                 st.success(f"Saved: **{doc_id}**")
                 if edit_id:
                     st.query_params.clear()
 
-        with b2:
+            st.markdown("---")
             auto_new_id = generate_doc_id(form_data["doc_type"], form_data.get("doc_code", ""))
-            new_name = st.text_input("Save as new doc ID", value=auto_new_id, key="new_doc_id", label_visibility="collapsed")
-            if st.button("📋 Save as New"):
+            new_name = st.text_input("New doc ID (editable)", value=auto_new_id, key="new_doc_id")
+            if st.button("📋 Save as New", use_container_width=True):
                 form_data["doc_id"] = new_name.strip() or auto_new_id
                 form_data.pop("created_at", None)
                 save_document(form_data)
                 st.success(f"Saved as new: **{form_data['doc_id']}**")
                 st.query_params.clear()
 
-        with b3:
-            if st.button("👁️ Preview"):
+        with b2:
+            if st.button("👁️ Preview", use_container_width=True):
                 form_data["doc_id"] = edit_id or "PREVIEW"
                 html = build_html(form_data, watermark=True)
                 st.components.v1.html(html, height=900, scrolling=True)
-
-        with b4:
-            if st.button("🔄 Clear Form"):
+            if st.button("🔄 Clear Form", use_container_width=True):
                 for k in list(st.session_state.keys()):
                     if k.startswith("active_terms_"):
                         del st.session_state[k]

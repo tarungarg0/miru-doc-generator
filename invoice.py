@@ -693,35 +693,32 @@ def doc_form(prefill=None):
 
         st.markdown("---")
 
-    # ── Client quick-load ──
-    clients = get_clients()
-    if clients:
-        sel_client = st.selectbox("Load client details", ["— type manually —"] + [c["name"] for c in clients], key=f"cl_sel_{uid}")
-        loaded_client = next((c for c in clients if c["name"] == sel_client), None)
-        if loaded_client:
-            client_q   = loaded_client["billing_address"] and client_q or loaded_client["name"]
-            billing_q  = loaded_client["billing_address"]
-            delivery_q = loaded_client["delivery_address"]
-    else:
-        loaded_client = None
+    # ── Client / project pulled from WO (read-only display) ──
+    client   = wo_loaded["client_name"]   if wo_loaded else p.get("client_name", client_q)
+    project  = wo_loaded["project_name"]  if wo_loaded else p.get("project_name", project_q)
+    billing  = billing_q   # already set from WO client lookup above
+    delivery = delivery_q
 
+    if wo_loaded:
+        st.info(f"📋 **{wo_loaded['wo_id']}** — {project} | Client: **{client}**")
+    else:
+        # No WO: allow manual entry
+        client  = st.text_input("Client Name",  value=client_q)
+        project = st.text_input("Project Name", value=project_q)
+        c3, c4 = st.columns(2)
+        billing  = c3.text_area("Billing Address",  value=billing_q,  height=80)
+        delivery = c4.text_area("Delivery Address", value=delivery_q, height=80)
+
+    # ── Doc type, date, transport ──
     col1, col2 = st.columns(2)
     with col1:
-        types = ["Quotation", "Proforma Invoice"]
-        doc_type = st.selectbox(
-            "Document Type", types,
-            index=types.index(p["doc_type"]) if p.get("doc_type") in types else 0,
-        )
-        project = st.text_input("Project Name", value=wo_loaded["project_name"] if wo_loaded else project_q)
-        client  = st.text_input("Client Name",  value=wo_loaded["client_name"] if wo_loaded else (loaded_client["name"] if loaded_client else client_q))
-        doc_code = st.text_input(
-            "Document Code (short code for doc ID, e.g. MIRU-SHARMA)",
-            value=p.get("doc_code", ""),
-            help="Used in doc number: PI-2026-MIRU-SHARMA-001",
-        )
-        notes = st.text_input("Internal Notes (not printed on PDF)", value=p.get("notes", ""))
-        if loaded_client and loaded_client.get("payment_terms"):
-            st.info(f"💳 Payment Terms: {loaded_client['payment_terms']}")
+        types    = ["Quotation", "Proforma Invoice"]
+        doc_type = st.selectbox("Document Type", types,
+                                index=types.index(p["doc_type"]) if p.get("doc_type") in types else 0)
+        doc_code = st.text_input("Document Code (e.g. SHARMA)",
+                                 value=p.get("doc_code", ""),
+                                 help="Used in doc ID: PI-2026-SHARMA-001")
+        notes    = st.text_input("Internal Notes (not on PDF)", value=p.get("notes", ""))
     with col2:
         try:
             default_date = date.fromisoformat(str(p["doc_date"])) if p.get("doc_date") else date.today()
@@ -737,54 +734,26 @@ def doc_form(prefill=None):
                 default_v = date.today() + timedelta(days=30)
             validity_date = st.date_input("Valid Until", value=default_v)
 
-        transport = st.radio(
-            "Transport Charges", ["Included", "Extra"],
-            index=["Included", "Extra"].index(p.get("transport", "Included")),
-        )
+        transport = st.radio("Transport Charges", ["Included", "Extra"],
+                             index=["Included", "Extra"].index(p.get("transport", "Included")))
         transport_amount = 0.0
         if transport == "Extra":
-            transport_amount = st.number_input(
-                "Transport Amount (₹)", min_value=0.0,
-                value=float(p.get("transport_amount", 0)),
-            )
+            transport_amount = st.number_input("Transport Amount (₹)", min_value=0.0,
+                                               value=float(p.get("transport_amount", 0)))
 
-    c3, c4 = st.columns(2)
-    with c3:
-        billing  = st.text_area("Billing Address",  value=billing_q,  height=100)
-    with c4:
-        delivery = st.text_area("Delivery Address", value=delivery_q, height=100)
-
-    # ── Terms ──
-    st.markdown("---")
-    st.subheader("Terms & Conditions")
-    templates = get_templates()
-    tpl_options = ["— select —"] + list(templates.keys())
-
-    tc1, tc2 = st.columns([3, 1])
-    chosen_tpl = tc1.selectbox("Load a template", tpl_options, key=f"tpl_select_{uid}")
-    apply_tpl  = tc2.button("↺ Apply Template", key=f"apply_tpl_{uid}")
-
+    # ── Terms: auto-loaded from WO; shown read-only ──
     terms_key = f"active_terms_{uid}"
-    if apply_tpl and chosen_tpl != "— select —":
-        st.session_state[terms_key] = templates[chosen_tpl]
-    elif terms_key not in st.session_state:
-        st.session_state[terms_key] = p.get("terms") or [""]
+    # Seed from WO on first load (WO block already sets this if WO has terms)
+    if terms_key not in st.session_state:
+        st.session_state[terms_key] = p.get("terms") or []
 
-    default_terms = st.session_state[terms_key]
-
-    term_count = st.number_input("Number of terms", 1, 15, value=len(default_terms), step=1, key=f"tc_{uid}")
-    terms = [
-        st.text_area(f"Term {i+1}",
-                     value=default_terms[i] if i < len(default_terms) else "",
-                     key=f"term_{uid}_{i}", height=60)
-        for i in range(int(term_count))
-    ]
-
-    with st.expander("💾 Save these as a new template"):
-        tname = st.text_input("Template name", key=f"tpl_name_{uid}")
-        if st.button("Save Template", key=f"save_tpl_{uid}") and tname.strip():
-            save_template(tname.strip(), [t for t in terms if t.strip()])
-            st.success(f"Template '{tname}' saved.")
+    terms = st.session_state[terms_key]
+    if terms:
+        with st.expander(f"📜 Terms & Conditions ({len(terms)} lines — from WO)", expanded=False):
+            for t in terms:
+                st.markdown(f"• {t}")
+    else:
+        st.caption("No terms set. Add them in the Work Order to auto-load here.")
 
     # ── Line Items ──
     st.markdown("---")

@@ -770,6 +770,10 @@ def doc_form(prefill=None):
     items = []
     hsn_options = ["68109990", "68109100", "69072100", "Other"]
 
+    # When a WO milestone is selected, include its index in widget keys so
+    # Streamlit treats them as new widgets and picks up the recalculated rate.
+    ms_sfx = f"_ms{selected_milestone[0]}" if selected_milestone else ""
+
     for i in range(int(item_count)):
         ei = existing[i] if i < len(existing) else {}
         with st.expander(f"Item {i+1}", expanded=True):
@@ -815,7 +819,7 @@ def doc_form(prefill=None):
                 hsn     = st.text_input("HSN Code", value=ei_hsn if hchoice == "Other" else hchoice, key=f"hsn_{uid}_{i}")
                 desc    = st.text_input("Description", value=auto_desc, key=f"desc_{uid}_{i}")
             with cb:
-                qty       = st.number_input("Quantity", value=float(ei.get("qty", 0)), key=f"qty_{uid}_{i}", min_value=0.0)
+                qty       = st.number_input("Quantity", value=float(ei.get("qty", 0)), key=f"qty_{uid}_{ms_sfx}_{i}", min_value=0.0)
                 unit_opts = ["RFT", "SQFT", "SQM", "PC", "KG"]
                 def_unit  = cat_item["unit"] if cat_item else ei.get("unit", "RFT")
                 ui        = unit_opts.index(def_unit) if def_unit in unit_opts else 0
@@ -825,8 +829,8 @@ def doc_form(prefill=None):
                     # Show split rates
                     sr_default  = float(cat_item.get("supply_rate", cat_item.get("base_rate", 0)))
                     ir_default  = float(cat_item.get("installation_rate", 0))
-                    supply_rate = st.number_input("Supply Rate (₹)", value=float(ei.get("supply_rate", sr_default)), key=f"sr_{uid}_{i}", min_value=0.0)
-                    install_rate= st.number_input("Installation Rate (₹)", value=float(ei.get("install_rate", ir_default)), key=f"ir_{uid}_{i}", min_value=0.0)
+                    supply_rate = st.number_input("Supply Rate (₹)", value=float(ei.get("supply_rate", sr_default)), key=f"sr_{uid}_{ms_sfx}_{i}", min_value=0.0)
+                    install_rate= st.number_input("Installation Rate (₹)", value=float(ei.get("install_rate", ir_default)), key=f"ir_{uid}_{ms_sfx}_{i}", min_value=0.0)
                     rate        = supply_rate  # stored on main row; install_rate stored separately
                     st.caption(f"Supply: ₹{format_inr(qty*supply_rate)} | Install: ₹{format_inr(qty*install_rate)} | Total: ₹{format_inr(qty*(supply_rate+install_rate))}")
                 else:
@@ -835,7 +839,7 @@ def doc_form(prefill=None):
                     rate_default = float(ei.get("rate", 0)) if ei.get("rate") else (
                         float(cat_item.get("supply_rate", cat_item["base_rate"]) if sale_type == "Supply" else
                               cat_item.get("installation_rate", cat_item["base_rate"])) if cat_item else 0.0)
-                    rate = st.number_input("Rate (₹)", value=rate_default, key=f"rate_{uid}_{i}", min_value=0.0)
+                    rate = st.number_input("Rate (₹)", value=rate_default, key=f"rate_{uid}_{ms_sfx}_{i}", min_value=0.0)
                     st.caption(f"Amount: ₹{format_inr(qty * rate)}")
 
         items.append({"hsn": hsn, "desc": desc, "qty": qty, "unit": unit,

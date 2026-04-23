@@ -715,8 +715,16 @@ def doc_form(prefill=None):
         types    = ["Quotation", "Proforma Invoice"]
         doc_type = st.selectbox("Document Type", types,
                                 index=types.index(p["doc_type"]) if p.get("doc_type") in types else 0)
+        def _auto_code(wo):
+            """Derive a short doc code from WO client/project name."""
+            name  = (wo.get("client_name") or wo.get("project_name") or "").upper()
+            words = name.split()
+            if len(words) >= 2:
+                return "".join(w[:3] for w in words[:3])
+            return words[0][:8] if words else ""
+        auto_code = _auto_code(wo_loaded) if wo_loaded else p.get("doc_code", "")
         doc_code = st.text_input("Document Code (e.g. SHARMA)",
-                                 value=p.get("doc_code", ""),
+                                 value=auto_code,
                                  help="Used in doc ID: PI-2026-SHARMA-001")
         notes    = st.text_input("Internal Notes (not on PDF)", value=p.get("notes", ""))
     with col2:
@@ -790,14 +798,16 @@ def doc_form(prefill=None):
             s_rate      = float(it.get("supply_rate", base))
             i_rate      = float(it.get("installation_rate", 0))
             row = {
-                "hsn":         "",
-                "desc":        it.get("description", ""),
-                "qty":         float(it.get("qty", 0)),
-                "unit":        it.get("unit", ""),
-                "rate":        round(base * rate_pct, 2),
-                "supply_rate": round(s_rate * rate_pct, 2),
-                "install_rate": round(i_rate * rate_pct, 2),
-                "sale_type":   doc_sale_type,
+                "hsn":           "",
+                "desc":          it.get("description", ""),
+                "qty":           float(it.get("qty", 0)),
+                "area_per_piece": float(it.get("area_per_piece", 0)),
+                "pieces":        float(it.get("pieces", 0)),
+                "unit":          it.get("unit", ""),
+                "rate":          round(base * rate_pct, 2),
+                "supply_rate":   round(s_rate * rate_pct, 2),
+                "install_rate":  round(i_rate * rate_pct, 2),
+                "sale_type":     doc_sale_type,
             }
             existing.append(row)
         if caption_text:
@@ -874,11 +884,25 @@ def doc_form(prefill=None):
                     hsn     = st.text_input("HSN Code", value=ei_hsn if hchoice == "Other" else hchoice, key=f"hsn_{uid}_{wk}_{i}")
                     desc    = st.text_input("Description", value=auto_desc, key=f"desc_{uid}_{wk}_{i}")
                 with cb:
-                    qty       = st.number_input("Quantity", value=float(ei.get("qty", 0)), key=f"qty_{uid}_{wk}_{i}", min_value=0.0)
-                    unit_opts = ["RFT", "SQFT", "SQM", "PC", "KG"]
+                    unit_opts = ["SQFT", "RFT", "SQM", "PC", "KG"]
                     def_unit  = (cat_item["unit"] if cat_item else None) or ei.get("unit", "SQFT")
                     ui        = unit_opts.index(def_unit) if def_unit in unit_opts else 0
                     unit      = st.selectbox("Unit", unit_opts, index=ui, key=f"unit_{uid}_{wk}_{i}")
+
+                    # Area per piece × pieces = total qty
+                    qr1, qr2 = st.columns(2)
+                    area_per_pc = qr1.number_input("Area per piece", value=float(ei.get("area_per_piece", 0.0)),
+                                                   min_value=0.0, key=f"app_{uid}_{wk}_{i}",
+                                                   help="e.g. sqft per panel")
+                    pieces      = qr2.number_input("No. of pieces", value=float(ei.get("pieces", 0.0)),
+                                                   min_value=0.0, key=f"pcs_{uid}_{wk}_{i}",
+                                                   help="Number of panels / units")
+                    if area_per_pc > 0 and pieces > 0:
+                        qty = round(area_per_pc * pieces, 3)
+                        st.caption(f"Total qty: {area_per_pc} × {pieces:.0f} = **{format_inr(qty)} {unit}**")
+                    else:
+                        qty = st.number_input("Total Qty (manual)", value=float(ei.get("qty", 0)),
+                                              key=f"qty_{uid}_{wk}_{i}", min_value=0.0)
 
                     if doc_sale_type == "Supply & Installation":
                         sr_default   = float(cat_item.get("supply_rate", cat_item.get("base_rate", 0))) if cat_item else float(ei.get("supply_rate", ei.get("rate", 0)))
@@ -904,7 +928,8 @@ def doc_form(prefill=None):
         if not skipped:
             items.append({"hsn": hsn, "desc": desc, "qty": qty, "unit": unit,
                           "rate": rate, "sale_type": doc_sale_type,
-                          "supply_rate": supply_rate, "install_rate": install_rate})
+                          "supply_rate": supply_rate, "install_rate": install_rate,
+                          "area_per_piece": area_per_pc, "pieces": pieces})
 
     # ── Totals preview ──
     subtotal = sum(float(it["qty"]) * float(it["rate"]) for it in items)
@@ -1070,18 +1095,20 @@ def work_orders_tab():
         wo_items = []
 
         # Column headers
-        h0, h1, h2, h3, h4, h5, h6 = st.columns([3, 1, 1, 1, 1, 1, 1])
+        h0, h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([3, 1, 1, 1, 1, 1, 1, 1, 1])
         h0.markdown("**Description**")
         h1.markdown("**Unit**")
-        h2.markdown("**Qty**")
-        h3.markdown("**Supply Rate ₹**")
-        h4.markdown("**Install Rate ₹**")
-        h5.markdown("**Total Rate ₹**")
-        h6.markdown("**Contract Value**")
+        h2.markdown("**Area/pc**")
+        h3.markdown("**Pieces**")
+        h4.markdown("**Total Qty**")
+        h5.markdown("**Supply ₹**")
+        h6.markdown("**Install ₹**")
+        h7.markdown("**Rate ₹**")
+        h8.markdown("**Contract Value**")
 
         for i in range(int(wo_item_count)):
             ei = ex_items[i] if i < len(ex_items) else {}
-            c0, c1, c2, c3, c4, c5, c6 = st.columns([3, 1, 1, 1, 1, 1, 1])
+            c0, c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([3, 1, 1, 1, 1, 1, 1, 1, 1])
 
             w_desc = c0.text_input("", value=ei.get("description", ""),
                                    key=f"wo_desc_{i}", label_visibility="collapsed",
@@ -1091,20 +1118,34 @@ def work_orders_tab():
             w_unit = c1.selectbox("", w_unit_opts,
                                   index=w_unit_opts.index(def_unit) if def_unit in w_unit_opts else 0,
                                   key=f"wo_unit_{i}", label_visibility="collapsed")
-            w_qty        = c2.number_input("", value=float(ei.get("qty", 0)), min_value=0.0,
-                                           key=f"wo_qty_{i}", label_visibility="collapsed")
-            w_supply_rate = c3.number_input("", value=float(ei.get("supply_rate", ei.get("rate", 0))),
-                                            min_value=0.0, key=f"wo_srate_{i}", label_visibility="collapsed")
-            w_install_rate = c4.number_input("", value=float(ei.get("installation_rate", 0)),
+
+            w_area_per_pc  = c2.number_input("", value=float(ei.get("area_per_piece", 0.0)),
+                                             min_value=0.0, key=f"wo_app_{i}", label_visibility="collapsed",
+                                             help="Area per piece (sqft/pc)")
+            w_pieces       = c3.number_input("", value=float(ei.get("pieces", 0.0)),
+                                             min_value=0.0, key=f"wo_pcs_{i}", label_visibility="collapsed",
+                                             help="Number of pieces")
+            if w_area_per_pc > 0 and w_pieces > 0:
+                w_qty = round(w_area_per_pc * w_pieces, 3)
+                c4.markdown(f"**{format_inr(w_qty)}**")
+            else:
+                w_qty = c4.number_input("", value=float(ei.get("qty", 0)), min_value=0.0,
+                                        key=f"wo_qty_{i}", label_visibility="collapsed")
+
+            w_supply_rate  = c5.number_input("", value=float(ei.get("supply_rate", ei.get("rate", 0))),
+                                             min_value=0.0, key=f"wo_srate_{i}", label_visibility="collapsed")
+            w_install_rate = c6.number_input("", value=float(ei.get("installation_rate", 0)),
                                              min_value=0.0, key=f"wo_irate_{i}", label_visibility="collapsed")
             w_total_rate = w_supply_rate + w_install_rate
-            c5.markdown(f"**₹{format_inr(w_total_rate)}**")
-            c6.markdown(f"₹{format_inr(w_qty * w_total_rate)}")
+            c7.markdown(f"**₹{format_inr(w_total_rate)}**")
+            c8.markdown(f"₹{format_inr(w_qty * w_total_rate)}")
 
             wo_items.append({
                 "description":      w_desc,
                 "unit":             w_unit,
                 "qty":              w_qty,
+                "area_per_piece":   w_area_per_pc,
+                "pieces":           w_pieces,
                 "rate":             w_total_rate,
                 "supply_rate":      w_supply_rate,
                 "installation_rate": w_install_rate,

@@ -1,3 +1,6 @@
 streamlit
+gspread
+google-auth
+requests
 openpyxl
-weasyprint
+Pillow

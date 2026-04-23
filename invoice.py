@@ -715,20 +715,54 @@ def doc_form(prefill=None):
     catalog = get_items()
     catalog_map = {f"{it['item_code']} — {it['description']}": it for it in catalog}
 
-    # If work order loaded, use its items and calculate billing rate (cumulative milestone %)
+    # If work order loaded, use its items and calculate billing rate based on sale type
     if wo_loaded and selected_milestone and wo_loaded["items"]:
-        all_ms_for_rate   = wo_loaded["milestones"]
-        sel_orig_idx_rate = selected_milestone[0]
-        cum_pct_for_rate  = sum(float(m["percent"]) for j, m in enumerate(all_ms_for_rate) if j <= sel_orig_idx_rate)
-        ms_pct            = cum_pct_for_rate / 100
-        existing = [
-            {"hsn": "", "desc": it["description"],
-             "qty": float(it["qty"]),
-             "unit": it["unit"],
-             "rate": round(float(it["rate"]) * ms_pct, 2)}
-            for it in wo_loaded["items"]
-        ]
-        st.caption(f"Items loaded from {wo_loaded['wo_id']} — rate = full rate × {cum_pct_for_rate:.0f}% (cumulative)")
+        all_ms_for_rate    = wo_loaded["milestones"]
+        sel_orig_idx_rate  = selected_milestone[0]
+        # Cumulative % = all milestones up to & including selected (for Supply)
+        cum_pct            = sum(float(m["percent"]) for j, m in enumerate(all_ms_for_rate) if j <= sel_orig_idx_rate)
+        # Own % = only the selected milestone (for Installation)
+        own_pct            = float(selected_milestone[1]["percent"])
+
+        def _wo_item_rate(it):
+            stype      = it.get("sale_type", "Supply")
+            base_rate  = float(it.get("rate", 0))
+            s_rate     = float(it.get("supply_rate", base_rate))
+            i_rate     = float(it.get("installation_rate", 0))
+
+            if stype == "Installation":
+                # Installation billed at just the selected milestone %
+                return round(base_rate * own_pct / 100, 2), None, None
+            elif stype == "Supply & Installation":
+                # Supply portion → cumulative %; Installation portion → own %
+                return (
+                    round(s_rate * cum_pct / 100, 2),   # supply_rate for this PI
+                    round(i_rate * own_pct / 100, 2),   # install_rate for this PI
+                    "Supply & Installation"
+                )
+            else:  # Supply (default)
+                return round(base_rate * cum_pct / 100, 2), None, None
+
+        existing = []
+        for it in wo_loaded["items"]:
+            r, ir, stype_override = _wo_item_rate(it)
+            row = {
+                "hsn":        "",
+                "desc":       it["description"],
+                "qty":        float(it["qty"]),
+                "unit":       it["unit"],
+                "rate":       r,
+                "sale_type":  stype_override or it.get("sale_type", "Supply"),
+            }
+            if ir is not None:
+                row["supply_rate"]  = r
+                row["install_rate"] = ir
+            existing.append(row)
+
+        st.caption(
+            f"Items loaded from {wo_loaded['wo_id']} — "
+            f"Supply: {cum_pct:.0f}% cumulative | Installation: {own_pct:.0f}% (this milestone only)"
+        )
     else:
         existing = p.get("items", [])
 

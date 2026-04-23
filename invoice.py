@@ -86,7 +86,11 @@ def ensure_sheets():
         ws = sh.worksheet("Work_Orders")
         headers = ws.row_values(1)
         if "terms_json" not in headers:
-            ws.update_cell(1, len(headers) + 1, "terms_json")
+            new_col = len(headers) + 1
+            # Resize sheet first if needed so new column fits
+            if ws.col_count < new_col:
+                ws.resize(cols=new_col)
+            ws.update_cell(1, new_col, "terms_json")
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 

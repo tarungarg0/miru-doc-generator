@@ -588,13 +588,31 @@ def doc_form(prefill=None):
             if not pending_ms:
                 st.warning("All milestones have been billed for this work order.")
             else:
-                ms_options = [f"{m['name']} — {m['percent']}% = ₹{format_inr(total_value * m['percent'] / 100)}" for _, m in pending_ms]
+                all_ms = wo_loaded["milestones"]
+
+                def _cumulative_pct(sel_orig_idx):
+                    """Sum percentages of all milestones from 0 up to and including sel_orig_idx."""
+                    return sum(float(m["percent"]) for j, m in enumerate(all_ms) if j <= sel_orig_idx)
+
+                ms_options = [
+                    f"{m['name']} — {m['percent']}% (Cumulative: {_cumulative_pct(i):.0f}%) = ₹{format_inr(total_value * _cumulative_pct(i) / 100)}"
+                    for i, m in pending_ms
+                ]
                 ms_sel = st.selectbox("Select Milestone to Bill", ms_options, key=f"ms_sel_{uid}")
                 ms_idx_in_pending = ms_options.index(ms_sel)
                 selected_milestone = pending_ms[ms_idx_in_pending]
 
-                billing_amount = total_value * selected_milestone[1]["percent"] / 100
-                st.info(f"💰 **Billing Amount:** ₹{format_inr(billing_amount)} ({selected_milestone[1]['percent']}% of ₹{format_inr(total_value)})")
+                sel_orig_idx   = selected_milestone[0]
+                cumulative_pct = _cumulative_pct(sel_orig_idx)
+                billing_amount = total_value * cumulative_pct / 100
+
+                # Build breakdown string  e.g. "10% (Advance✓) + 75% (Before Dispatch) = 85%"
+                breakdown_parts = [
+                    f"{float(m['percent']):.0f}% ({m['name']}{'✓' if m['status']=='Billed' else ''})"
+                    for j, m in enumerate(all_ms) if j <= sel_orig_idx
+                ]
+                breakdown = " + ".join(breakdown_parts) + f" = {cumulative_pct:.0f}%"
+                st.info(f"💰 **Billing Amount:** ₹{format_inr(billing_amount)}\n\n{breakdown} of ₹{format_inr(total_value)}")
                 billing_override = billing_amount
         st.markdown("---")
 
@@ -697,9 +715,12 @@ def doc_form(prefill=None):
     catalog = get_items()
     catalog_map = {f"{it['item_code']} — {it['description']}": it for it in catalog}
 
-    # If work order loaded, use its items and calculate billing rate
+    # If work order loaded, use its items and calculate billing rate (cumulative milestone %)
     if wo_loaded and selected_milestone and wo_loaded["items"]:
-        ms_pct   = selected_milestone[1]["percent"] / 100
+        all_ms_for_rate   = wo_loaded["milestones"]
+        sel_orig_idx_rate = selected_milestone[0]
+        cum_pct_for_rate  = sum(float(m["percent"]) for j, m in enumerate(all_ms_for_rate) if j <= sel_orig_idx_rate)
+        ms_pct            = cum_pct_for_rate / 100
         existing = [
             {"hsn": "", "desc": it["description"],
              "qty": float(it["qty"]),
@@ -707,7 +728,7 @@ def doc_form(prefill=None):
              "rate": round(float(it["rate"]) * ms_pct, 2)}
             for it in wo_loaded["items"]
         ]
-        st.caption(f"Items loaded from {wo_loaded['wo_id']} — rate = full rate × {selected_milestone[1]['percent']}%")
+        st.caption(f"Items loaded from {wo_loaded['wo_id']} — rate = full rate × {cum_pct_for_rate:.0f}% (cumulative)")
     else:
         existing = p.get("items", [])
 

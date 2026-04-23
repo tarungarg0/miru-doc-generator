@@ -670,7 +670,7 @@ def doc_form(prefill=None):
                             for i, m in pending_ms
                         ]
 
-                    ms_sel = st.selectbox("Select Milestone to Bill", ms_options, key=f"ms_sel_{uid}")
+                    ms_sel = st.selectbox("Select Milestone to Bill", ms_options, key=f"ms_sel_{uid}_{doc_sale_type}")
                     ms_idx_in_pending  = ms_options.index(ms_sel)
                     selected_milestone = pending_ms[ms_idx_in_pending]
                     sel_orig_idx       = selected_milestone[0]
@@ -819,7 +819,8 @@ def doc_form(prefill=None):
     # Widget key suffix: changes when WO or milestone changes → forces Streamlit
     # to treat them as new widgets and use the freshly computed default values.
     wo_key  = wo_loaded["wo_id"].replace("-", "") if wo_loaded else "manual"
-    wk      = f"{wo_key}_{ms_sfx}"   # combined suffix used on every item widget
+    st_key  = doc_sale_type.replace(" ", "")       # "Supply" / "Installation" / "Supply&Installation"
+    wk      = f"{wo_key}_{st_key}_{ms_sfx}"        # combined suffix used on every item widget
 
     item_count = st.number_input("Number of items", 1, 20, value=max(1, len(existing)),
                                  step=1, key=f"ic_{uid}_{wk}")

@@ -34,6 +34,7 @@ DOC_HEADERS = [
     "billing_address", "delivery_address", "doc_date", "validity_date",
     "transport", "transport_amount", "items_json", "terms_json", "created_at",
     "approval_token", "approved_by", "approved_at", "signature_b64", "notes", "doc_code",
+    "vehicle_no", "transporter_name", "distance_km", "transport_mode",
 ]
 TEMPLATE_HEADERS  = ["name", "terms_json"]
 MANAGER_HEADERS   = ["name", "whatsapp", "pin", "signature_b64"]
@@ -200,11 +201,13 @@ def save_document(data, edit_id=None):
         json.dumps(data["items"]), json.dumps(data["terms"]),
         data.get("created_at", datetime.now().isoformat()),
         token, "", "", "", data.get("notes", ""), data.get("doc_code", ""),
+        data.get("vehicle_no", ""), data.get("transporter_name", ""),
+        data.get("distance_km", ""), data.get("transport_mode", "Road"),
     ]
     if edit_id:
         for i, r in enumerate(records):
             if r["doc_id"] == edit_id:
-                ws.update(f"A{i+2}:T{i+2}", [row])
+                ws.update(f"A{i+2}:X{i+2}", [row])
                 _bust()
                 return data["doc_id"]
     ws.append_row(row)
@@ -474,6 +477,17 @@ def build_html(data, signature_b64=None, watermark=False):
     if data.get("validity_date") and data.get("doc_type") == "Quotation":
         validity_html = f"<p style='font-size:11px;margin:2px 0'><b>Valid Until:</b> {data['validity_date']}</p>"
 
+    ewb_html = ""
+    if data.get("doc_type") == "Tax Invoice" and (data.get("vehicle_no") or data.get("transporter_name")):
+        ewb_html = f"""
+        <div style='background:#f0f7ff;border:1px solid #c0d8f0;border-radius:4px;padding:8px 12px;margin-bottom:16px;font-size:11px;'>
+          <b>🚛 E-Way Bill Details</b>&nbsp;&nbsp;
+          Vehicle: <b>{data.get('vehicle_no','—')}</b>&nbsp;&nbsp;|&nbsp;&nbsp;
+          Transporter: <b>{data.get('transporter_name','—')}</b>&nbsp;&nbsp;|&nbsp;&nbsp;
+          Distance: <b>{data.get('distance_km','—')} km</b>&nbsp;&nbsp;|&nbsp;&nbsp;
+          Mode: <b>{data.get('transport_mode','Road')}</b>
+        </div>"""
+
     sig_html = ""
     if signature_b64:
         sig_html = f"""
@@ -551,6 +565,7 @@ td{{font-size:11px;}}
   </div>
 </div>
 
+{ewb_html}
 <table>
   <thead><tr><th>TYPE</th><th>HSN</th><th>DESCRIPTION</th><th>AREA/PC × PCS = QTY</th><th>UNIT</th><th>RATE</th><th>AMOUNT</th></tr></thead>
   <tbody>{rows}</tbody>
@@ -760,7 +775,7 @@ def doc_form(prefill=None):
     # ── Doc type, date, transport ──
     col1, col2 = st.columns(2)
     with col1:
-        types    = ["Quotation", "Proforma Invoice"]
+        types    = ["Quotation", "Proforma Invoice", "Tax Invoice"]
         doc_type = st.selectbox("Document Type", types,
                                 index=types.index(p["doc_type"]) if p.get("doc_type") in types else 0)
         def _auto_code(wo):
@@ -796,6 +811,25 @@ def doc_form(prefill=None):
         if transport == "Extra":
             transport_amount = st.number_input("Transport Amount (₹)", min_value=0.0,
                                                value=float(p.get("transport_amount", 0)))
+
+    # ── E-Way Bill fields (Tax Invoice only) ──
+    vehicle_no = ""; transporter_name = ""; distance_km = ""; transport_mode = "Road"
+    if doc_type == "Tax Invoice":
+        st.markdown("---")
+        st.subheader("🚛 E-Way Bill Details")
+        st.caption("Required for goods movement > ₹50,000. Will be used to auto-generate e-way bill on portal.")
+        ew1, ew2, ew3, ew4 = st.columns(4)
+        vehicle_no       = ew1.text_input("Vehicle No.", value=p.get("vehicle_no", ""),
+                                          placeholder="e.g. DL01AB1234", key=f"vno_{uid}")
+        transporter_name = ew2.text_input("Transporter Name", value=p.get("transporter_name", ""),
+                                          placeholder="e.g. DTDC Logistics", key=f"tname_{uid}")
+        distance_km      = ew3.text_input("Distance (km)", value=str(p.get("distance_km", "")),
+                                          placeholder="e.g. 15", key=f"dist_{uid}")
+        mode_opts        = ["Road", "Rail", "Air", "Ship"]
+        prev_mode        = p.get("transport_mode", "Road")
+        transport_mode   = ew4.selectbox("Mode of Transport", mode_opts,
+                                         index=mode_opts.index(prev_mode) if prev_mode in mode_opts else 0,
+                                         key=f"tmode_{uid}")
 
     # ── Terms: auto-loaded from WO; shown read-only ──
     terms_key = f"active_terms_{uid}"
@@ -996,6 +1030,10 @@ def doc_form(prefill=None):
         "notes":             notes,
         "wo_id":             wo_loaded["wo_id"] if wo_loaded else "",
         "wo_milestone_idx":  selected_milestone[0] if selected_milestone else None,
+        "vehicle_no":        vehicle_no,
+        "transporter_name":  transporter_name,
+        "distance_km":       distance_km,
+        "transport_mode":    transport_mode,
     }
 
 # ── Documents list ─────────────────────────────────────────────────────────────
@@ -1008,7 +1046,7 @@ def documents_tab():
         return
 
     c1, c2 = st.columns(2)
-    ftype   = c1.selectbox("Type",   ["All", "Quotation", "Proforma Invoice"])
+    ftype   = c1.selectbox("Type",   ["All", "Quotation", "Proforma Invoice", "Tax Invoice"])
     fstatus = c2.selectbox("Status", ["All", "Draft", "Pending Approval", "Approved"])
 
     filtered = [

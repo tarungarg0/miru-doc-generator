@@ -8,6 +8,7 @@ import hashlib
 import os
 import requests
 from urllib.parse import unquote, quote
+import anthropic
 
 st.set_page_config(page_title="MIRU Document Generator", layout="wide")
 
@@ -184,6 +185,71 @@ def img_b64(path):
         with open(path, "rb") as f:
             return base64.b64encode(f.read()).decode()
     return None
+
+# ── AI Extraction ──────────────────────────────────────────────────────────────
+
+def extract_boq_from_file(uploaded_file):
+    """Send image or PDF to Claude and extract structured BOQ / work order data."""
+    client = anthropic.Anthropic(api_key=st.secrets["anthropic"]["api_key"])
+
+    file_bytes = uploaded_file.read()
+    file_b64   = base64.b64encode(file_bytes).decode()
+    mime       = uploaded_file.type  # e.g. image/jpeg, image/png, application/pdf
+
+    # Build the content block
+    if mime == "application/pdf":
+        source_block = {"type": "base64", "media_type": "application/pdf", "data": file_b64}
+        content_type = "document"
+    else:
+        source_block = {"type": "base64", "media_type": mime, "data": file_b64}
+        content_type = "image"
+
+    prompt = """Extract all BOQ / work order data from this document and return ONLY a JSON object with this exact structure:
+{
+  "project_name": "...",
+  "client_name": "...",
+  "scope": "...",
+  "items": [
+    {
+      "description": "...",
+      "unit": "SQFT",
+      "qty": 0.0,
+      "area_per_piece": 0.0,
+      "pieces": 0,
+      "supply_rate": 0.0,
+      "installation_rate": 0.0,
+      "rate": 0.0
+    }
+  ]
+}
+
+Rules:
+- For qty: use the TOTAL AREA / total quantity column (not per-piece area)
+- For area_per_piece: use the per-piece area if visible, else 0
+- For pieces: use total piece count if visible, else 0
+- For rate: if only one rate visible, put it in supply_rate and rate
+- If project/client not visible, use empty string
+- Return ONLY the JSON, no explanation"""
+
+    response = client.messages.create(
+        model="claude-opus-4-5",
+        max_tokens=2000,
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": content_type, "source": source_block},
+                {"type": "text", "text": prompt},
+            ],
+        }],
+    )
+
+    raw = response.content[0].text.strip()
+    # Strip markdown code fences if present
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    return json.loads(raw.strip())
 
 # ── Sheets CRUD ────────────────────────────────────────────────────────────────
 
@@ -1149,6 +1215,20 @@ def work_orders_tab():
     st.subheader("Work Orders")
     wos = get_work_orders()
 
+    # ── AI Extract from BOQ ──
+    with st.expander("🤖 Extract from BOQ Image / PDF", expanded=False):
+        st.caption("Upload a BOQ screenshot or PDF — Claude will read it and pre-fill the Work Order form.")
+        boq_file = st.file_uploader("Upload BOQ", type=["png", "jpg", "jpeg", "pdf"], key="boq_upload")
+        if boq_file and st.button("✨ Extract & Pre-fill", type="primary", key="boq_extract"):
+            with st.spinner("Reading document with AI..."):
+                try:
+                    extracted = extract_boq_from_file(boq_file)
+                    st.session_state["boq_extracted"] = extracted
+                    st.success(f"✅ Extracted {len(extracted.get('items', []))} items — scroll down to the form, fields are pre-filled.")
+                    st.json(extracted)
+                except Exception as e:
+                    st.error(f"Extraction failed: {e}")
+
     with st.expander("➕ Create / Edit Work Order", expanded=not bool(wos)):
         edit_wo = st.selectbox("Edit existing", ["— New Work Order —"] + [f"{w['wo_id']} — {w['project_name']}" for w in wos], key="edit_wo_sel")
         ew = next((w for w in wos if f"{w['wo_id']} — {w['project_name']}" == edit_wo), None) if edit_wo != "— New Work Order —" else None
@@ -1156,13 +1236,18 @@ def work_orders_tab():
         # Include WO ID in widget keys so switching WOs forces fresh values
         wok = ew["wo_id"].replace("-", "") if ew else "new"
 
+        # Pick up AI-extracted data if available
+        ai = st.session_state.pop("boq_extracted", None)
+
         clients = get_clients()
         wo_id      = st.text_input("Work Order ID", value=ew["wo_id"] if ew else generate_wo_id(), key=f"wo_id_{wok}")
         wo_client  = st.selectbox("Client", ["— select —"] + [c["name"] for c in clients],
                                   index=([c["name"] for c in clients].index(ew["client_name"]) + 1) if ew and ew.get("client_name") in [c["name"] for c in clients] else 0,
                                   key=f"wo_client_{wok}")
-        wo_project = st.text_input("Project Name", value=ew["project_name"] if ew else "", key=f"wo_project_{wok}")
-        wo_scope   = st.text_area("Scope of Work", value=ew["scope"] if ew else "", height=80, key=f"wo_scope_{wok}")
+        default_project = (ai["project_name"] if ai else None) or (ew["project_name"] if ew else "")
+        default_scope   = (ai["scope"]        if ai else None) or (ew["scope"]        if ew else "")
+        wo_project = st.text_input("Project Name", value=default_project, key=f"wo_project_{wok}")
+        wo_scope   = st.text_area("Scope of Work", value=default_scope, height=80, key=f"wo_scope_{wok}")
         wo_status  = st.selectbox("Status", ["Active", "Completed", "On Hold"],
                                   index=["Active","Completed","On Hold"].index(ew["status"]) if ew and ew.get("status") in ["Active","Completed","On Hold"] else 0,
                                   key=f"wo_status_{wok}")
@@ -1170,7 +1255,7 @@ def work_orders_tab():
         # Work order items — enter directly, auto-sync to Items catalog on save
         st.markdown("**Items & Rates**")
         st.caption("Enter items directly here — they will be automatically added to the Items catalog when you save.")
-        ex_items = ew["items"] if ew else []
+        ex_items = ai["items"] if ai else (ew["items"] if ew else [])
 
         wo_item_count = st.number_input("Number of items", 1, 30, value=max(1, len(ex_items)), step=1, key=f"wo_ic_{wok}")
         wo_items = []

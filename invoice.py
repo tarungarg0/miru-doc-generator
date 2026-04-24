@@ -1115,21 +1115,26 @@ def work_orders_tab():
         edit_wo = st.selectbox("Edit existing", ["— New Work Order —"] + [f"{w['wo_id']} — {w['project_name']}" for w in wos], key="edit_wo_sel")
         ew = next((w for w in wos if f"{w['wo_id']} — {w['project_name']}" == edit_wo), None) if edit_wo != "— New Work Order —" else None
 
+        # Include WO ID in widget keys so switching WOs forces fresh values
+        wok = ew["wo_id"].replace("-", "") if ew else "new"
+
         clients = get_clients()
-        wo_id      = st.text_input("Work Order ID", value=ew["wo_id"] if ew else generate_wo_id())
+        wo_id      = st.text_input("Work Order ID", value=ew["wo_id"] if ew else generate_wo_id(), key=f"wo_id_{wok}")
         wo_client  = st.selectbox("Client", ["— select —"] + [c["name"] for c in clients],
-                                  index=([c["name"] for c in clients].index(ew["client_name"]) + 1) if ew and ew.get("client_name") in [c["name"] for c in clients] else 0)
-        wo_project = st.text_input("Project Name", value=ew["project_name"] if ew else "")
-        wo_scope   = st.text_area("Scope of Work", value=ew["scope"] if ew else "", height=80)
+                                  index=([c["name"] for c in clients].index(ew["client_name"]) + 1) if ew and ew.get("client_name") in [c["name"] for c in clients] else 0,
+                                  key=f"wo_client_{wok}")
+        wo_project = st.text_input("Project Name", value=ew["project_name"] if ew else "", key=f"wo_project_{wok}")
+        wo_scope   = st.text_area("Scope of Work", value=ew["scope"] if ew else "", height=80, key=f"wo_scope_{wok}")
         wo_status  = st.selectbox("Status", ["Active", "Completed", "On Hold"],
-                                  index=["Active","Completed","On Hold"].index(ew["status"]) if ew and ew.get("status") in ["Active","Completed","On Hold"] else 0)
+                                  index=["Active","Completed","On Hold"].index(ew["status"]) if ew and ew.get("status") in ["Active","Completed","On Hold"] else 0,
+                                  key=f"wo_status_{wok}")
 
         # Work order items — enter directly, auto-sync to Items catalog on save
         st.markdown("**Items & Rates**")
         st.caption("Enter items directly here — they will be automatically added to the Items catalog when you save.")
         ex_items = ew["items"] if ew else []
 
-        wo_item_count = st.number_input("Number of items", 1, 30, value=max(1, len(ex_items)), step=1, key="wo_ic")
+        wo_item_count = st.number_input("Number of items", 1, 30, value=max(1, len(ex_items)), step=1, key=f"wo_ic_{wok}")
         wo_items = []
 
         # Column headers
@@ -1149,31 +1154,31 @@ def work_orders_tab():
             c0, c1, c2, c3, c4, c5, c6, c7, c8 = st.columns([3, 1, 1, 1, 1, 1, 1, 1, 1])
 
             w_desc = c0.text_input("", value=ei.get("description", ""),
-                                   key=f"wo_desc_{i}", label_visibility="collapsed",
+                                   key=f"wo_desc_{wok}_{i}", label_visibility="collapsed",
                                    placeholder="e.g. GFRC RB-COL-2524")
             w_unit_opts = ["SQFT", "RFT", "SQM", "PC", "KG"]
             def_unit = ei.get("unit", "SQFT")
             w_unit = c1.selectbox("", w_unit_opts,
                                   index=w_unit_opts.index(def_unit) if def_unit in w_unit_opts else 0,
-                                  key=f"wo_unit_{i}", label_visibility="collapsed")
+                                  key=f"wo_unit_{wok}_{i}", label_visibility="collapsed")
 
             w_area_per_pc  = c2.number_input("", value=float(ei.get("area_per_piece", 0.0)),
-                                             min_value=0.0, key=f"wo_app_{i}", label_visibility="collapsed",
+                                             min_value=0.0, key=f"wo_app_{wok}_{i}", label_visibility="collapsed",
                                              help="Area per piece (sqft/pc)")
             w_pieces       = c3.number_input("", value=float(ei.get("pieces", 0.0)),
-                                             min_value=0.0, key=f"wo_pcs_{i}", label_visibility="collapsed",
+                                             min_value=0.0, key=f"wo_pcs_{wok}_{i}", label_visibility="collapsed",
                                              help="Number of pieces")
             if w_area_per_pc > 0 and w_pieces > 0:
                 w_qty = round(w_area_per_pc * w_pieces, 3)
                 c4.markdown(f"**{format_inr(w_qty)}**")
             else:
                 w_qty = c4.number_input("", value=float(ei.get("qty", 0)), min_value=0.0,
-                                        key=f"wo_qty_{i}", label_visibility="collapsed")
+                                        key=f"wo_qty_{wok}_{i}", label_visibility="collapsed")
 
             w_supply_rate  = c5.number_input("", value=float(ei.get("supply_rate", ei.get("rate", 0))),
-                                             min_value=0.0, key=f"wo_srate_{i}", label_visibility="collapsed")
+                                             min_value=0.0, key=f"wo_srate_{wok}_{i}", label_visibility="collapsed")
             w_install_rate = c6.number_input("", value=float(ei.get("installation_rate", 0)),
-                                             min_value=0.0, key=f"wo_irate_{i}", label_visibility="collapsed")
+                                             min_value=0.0, key=f"wo_irate_{wok}_{i}", label_visibility="collapsed")
             w_total_rate = w_supply_rate + w_install_rate
             c7.markdown(f"**₹{format_inr(w_total_rate)}**")
             c8.markdown(f"₹{format_inr(w_qty * w_total_rate)}")
@@ -1201,16 +1206,16 @@ def work_orders_tab():
         mc1, mc2, mc3 = st.columns([3, 1, 1])
         mc1.markdown("**Milestone**"); mc2.markdown("**%**"); mc3.markdown("**Status**")
 
-        adv_pct  = mc2.number_input("", value=float(_ms_val("Advance","percent",10)), min_value=0.0, max_value=100.0, key="ms_adv_pct", label_visibility="collapsed")
-        adv_st   = mc3.selectbox("", STATUSES, index=STATUSES.index(_ms_val("Advance","status","Pending")), key="ms_adv_st", label_visibility="collapsed")
+        adv_pct  = mc2.number_input("", value=float(_ms_val("Advance","percent",10)), min_value=0.0, max_value=100.0, key=f"ms_adv_pct_{wok}", label_visibility="collapsed")
+        adv_st   = mc3.selectbox("", STATUSES, index=STATUSES.index(_ms_val("Advance","status","Pending")), key=f"ms_adv_st_{wok}", label_visibility="collapsed")
         mc1.markdown("Advance")
 
-        sup_pct  = mc2.number_input("", value=float(_ms_val("Supply","percent",75)), min_value=0.0, max_value=100.0, key="ms_sup_pct", label_visibility="collapsed")
-        sup_st   = mc3.selectbox("", STATUSES, index=STATUSES.index(_ms_val("Supply","status","Pending")), key="ms_sup_st", label_visibility="collapsed")
+        sup_pct  = mc2.number_input("", value=float(_ms_val("Supply","percent",75)), min_value=0.0, max_value=100.0, key=f"ms_sup_pct_{wok}", label_visibility="collapsed")
+        sup_st   = mc3.selectbox("", STATUSES, index=STATUSES.index(_ms_val("Supply","status","Pending")), key=f"ms_sup_st_{wok}", label_visibility="collapsed")
         mc1.markdown("Supply")
 
-        ins_pct  = mc2.number_input("", value=float(_ms_val("Installation","percent",15)), min_value=0.0, max_value=100.0, key="ms_ins_pct", label_visibility="collapsed")
-        ins_st   = mc3.selectbox("", STATUSES, index=STATUSES.index(_ms_val("Installation","status","Pending")), key="ms_ins_st", label_visibility="collapsed")
+        ins_pct  = mc2.number_input("", value=float(_ms_val("Installation","percent",15)), min_value=0.0, max_value=100.0, key=f"ms_ins_pct_{wok}", label_visibility="collapsed")
+        ins_st   = mc3.selectbox("", STATUSES, index=STATUSES.index(_ms_val("Installation","status","Pending")), key=f"ms_ins_st_{wok}", label_visibility="collapsed")
         mc1.markdown("Installation")
 
         milestones = [
@@ -1228,10 +1233,10 @@ def work_orders_tab():
         st.markdown("**Terms & Conditions** *(auto-loaded when this WO is selected in a PI)*")
         ex_wo_terms = ew["terms"] if ew else []
         wo_term_count = st.number_input("Number of terms", 0, 15,
-                                        value=max(1, len(ex_wo_terms)), step=1, key="wo_tc")
+                                        value=max(1, len(ex_wo_terms)), step=1, key=f"wo_tc_{wok}")
         wo_terms = [
             st.text_input(f"Term {j+1}", value=ex_wo_terms[j] if j < len(ex_wo_terms) else "",
-                          key=f"wo_term_{j}")
+                          key=f"wo_term_{wok}_{j}")
             for j in range(int(wo_term_count))
         ]
         wo_terms = [t for t in wo_terms if t.strip()]

@@ -934,9 +934,29 @@ def doc_form(prefill=None):
     catalog_map = {f"{it['item_code']} — {it['description']}": it for it in catalog}
 
     # ── Build existing items from WO or saved doc ──
+    # Helper: parse dispatch items_q into a list of {desc, qty, area_per_piece, pieces, unit}
+    def _parse_dispatch_items():
+        try:
+            raw = json.loads(items_q)
+            out = []
+            if raw and isinstance(raw[0], list):
+                for row in raw:
+                    desc    = row[0] if len(row) > 0 else ""
+                    pieces  = float(row[1]) if len(row) > 1 else 0
+                    area_pc = float(row[2]) if len(row) > 2 else 0
+                    qty     = round(area_pc * pieces, 2) if area_pc > 0 else pieces
+                    out.append({"desc": desc, "qty": qty, "area_per_piece": area_pc,
+                                "pieces": pieces, "unit": "SQFT" if area_pc > 0 else "PC"})
+            else:
+                out = raw
+            return out
+        except Exception:
+            return []
+
+    dispatch_items_parsed = _parse_dispatch_items() if (items_q and not p.get("items")) else []
+
     if wo_loaded and wo_loaded["items"]:
         # rate_pct already computed above in the WO milestone block
-        # (billing_override / total_value gives the same ratio)
         ms_sfx = doc_sale_type.replace(" ", "").replace("&", "")
         if doc_sale_type == "Supply":
             caption_text = f"Items from {wo_loaded['wo_id']} — {rate_pct*100:.0f}% (Advance + Supply)"
@@ -945,24 +965,61 @@ def doc_form(prefill=None):
         else:
             caption_text = f"Items from {wo_loaded['wo_id']} — 100% (Supply & Installation)"
 
-        existing = []
+        # Build a name→rate lookup from WO items (case-insensitive, normalized)
+        def _norm(s): return "".join(c.lower() for c in str(s) if c.isalnum())
+        wo_rate_map = {}
         for it in wo_loaded["items"]:
-            base        = float(it.get("rate", 0))
-            s_rate      = float(it.get("supply_rate", base))
-            i_rate      = float(it.get("installation_rate", 0))
-            row = {
-                "hsn":           "",
-                "desc":          it.get("description", ""),
-                "qty":           float(it.get("qty", 0)),
-                "area_per_piece": float(it.get("area_per_piece", 0)),
-                "pieces":        float(it.get("pieces", 0)),
-                "unit":          it.get("unit", ""),
-                "rate":          round(base * rate_pct, 2),
-                "supply_rate":   round(s_rate * rate_pct, 2),
-                "install_rate":  round(i_rate * rate_pct, 2),
-                "sale_type":     doc_sale_type,
-            }
-            existing.append(row)
+            wo_rate_map[_norm(it.get("description", ""))] = it
+        # Fallback "base rate" = first WO item's rate (used when dispatch desc doesn't match)
+        wo_base = wo_loaded["items"][0]
+        base_fallback         = float(wo_base.get("rate", 0))
+        supply_fallback       = float(wo_base.get("supply_rate", base_fallback))
+        install_fallback      = float(wo_base.get("installation_rate", 0))
+
+        existing = []
+        if dispatch_items_parsed:
+            # Dispatch dominates description/qty/area; rates come from WO (by name match, else base)
+            st.caption(f"📦 Dispatch items + rates from {wo_loaded['wo_id']} (base rate ₹{format_inr(base_fallback)})")
+            matched = 0
+            for di in dispatch_items_parsed:
+                wo_match = wo_rate_map.get(_norm(di.get("desc", "")))
+                if wo_match:
+                    matched += 1
+                    base   = float(wo_match.get("rate", 0))
+                    s_rate = float(wo_match.get("supply_rate", base))
+                    i_rate = float(wo_match.get("installation_rate", 0))
+                else:
+                    base, s_rate, i_rate = base_fallback, supply_fallback, install_fallback
+                existing.append({
+                    "hsn":            "68109990",
+                    "desc":           di.get("desc", ""),
+                    "qty":            float(di.get("qty", 0)),
+                    "area_per_piece": float(di.get("area_per_piece", 0)),
+                    "pieces":         float(di.get("pieces", 0)),
+                    "unit":           di.get("unit", "SQFT"),
+                    "rate":           round(base * rate_pct, 2),
+                    "supply_rate":    round(s_rate * rate_pct, 2),
+                    "install_rate":   round(i_rate * rate_pct, 2),
+                    "sale_type":      doc_sale_type,
+                })
+            st.caption(f"✓ {matched}/{len(dispatch_items_parsed)} items matched WO by description; rest use base rate.")
+        else:
+            for it in wo_loaded["items"]:
+                base        = float(it.get("rate", 0))
+                s_rate      = float(it.get("supply_rate", base))
+                i_rate      = float(it.get("installation_rate", 0))
+                existing.append({
+                    "hsn":           "",
+                    "desc":          it.get("description", ""),
+                    "qty":           float(it.get("qty", 0)),
+                    "area_per_piece": float(it.get("area_per_piece", 0)),
+                    "pieces":        float(it.get("pieces", 0)),
+                    "unit":          it.get("unit", ""),
+                    "rate":          round(base * rate_pct, 2),
+                    "supply_rate":   round(s_rate * rate_pct, 2),
+                    "install_rate":  round(i_rate * rate_pct, 2),
+                    "sale_type":     doc_sale_type,
+                })
         if caption_text:
             st.caption(caption_text)
     elif items_q and not p.get("items"):

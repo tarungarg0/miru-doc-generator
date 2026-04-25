@@ -1007,6 +1007,34 @@ def doc_form(prefill=None):
 
     item_count = st.number_input("Number of items", 1, 200, value=max(1, len(existing)),
                                  step=1, key=f"ic_{uid}_{wk}")
+
+    # ── Bulk rate fill ──
+    with st.expander("⚡ Bulk fill rate for all items", expanded=False):
+        st.caption("Set one rate and apply to every item below. You can still edit individual rates after.")
+        if doc_sale_type == "Supply & Installation":
+            bcs, bci, bca = st.columns([2, 2, 1])
+            bulk_supply = bcs.number_input("Supply Rate (₹)", min_value=0.0, value=0.0, key=f"bulk_sr_{uid}_{wk}")
+            bulk_install = bci.number_input("Installation Rate (₹)", min_value=0.0, value=0.0, key=f"bulk_ir_{uid}_{wk}")
+            with bca:
+                st.write("")
+                if st.button("Apply to all", key=f"bulk_apply_{uid}_{wk}", use_container_width=True):
+                    for j in range(int(item_count)):
+                        if bulk_supply > 0:
+                            st.session_state[f"sr_{uid}_{wk}_{j}"] = float(bulk_supply)
+                        if bulk_install > 0:
+                            st.session_state[f"ir_{uid}_{wk}_{j}"] = float(bulk_install)
+                    st.rerun()
+        else:
+            bcr, bca = st.columns([3, 1])
+            bulk_rate = bcr.number_input("Rate (₹)", min_value=0.0, value=0.0, key=f"bulk_rate_{uid}_{wk}")
+            with bca:
+                st.write("")
+                if st.button("Apply to all", key=f"bulk_apply_{uid}_{wk}", use_container_width=True):
+                    if bulk_rate > 0:
+                        for j in range(int(item_count)):
+                            st.session_state[f"rate_{uid}_{wk}_{j}"] = float(bulk_rate)
+                        st.rerun()
+
     items = []
     hsn_options = ["68109990", "68109100", "69072100", "Other"]
 

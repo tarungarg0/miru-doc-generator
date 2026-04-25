@@ -740,7 +740,22 @@ def doc_form(prefill=None):
     billing_q  = p.get("billing_address") or unquote(qp.get("billing", ""))
     delivery_q = p.get("delivery_address") or unquote(qp.get("address", ""))
     project_q  = p.get("project_name")    or unquote(qp.get("project", ""))
-    items_q    = unquote(qp.get("items",   ""))   # JSON-encoded items from dispatch dashboard
+    items_q    = unquote(qp.get("items",   ""))   # JSON-encoded items (legacy, kept for compat)
+
+    # ?dispatch=UUID  →  fetch client/project/items from MIRU dashboard API
+    dispatch_id = qp.get("dispatch", "")
+    if dispatch_id and not p.get("items"):
+        try:
+            import requests as _req
+            api_url = f"https://mirugrc-dash.vercel.app/api/invoice-data/{dispatch_id}"
+            r = _req.get(api_url, timeout=10)
+            if r.ok:
+                d = r.json()
+                if not client_q:  client_q  = d.get("client", "")
+                if not project_q: project_q = d.get("project", "")
+                items_q = json.dumps(d.get("items", []))
+        except Exception:
+            pass
 
     # ── Type of Sale (document-level — drives milestone filter & rate logic) ──
     ALL_SALE_TYPES = ["Supply", "Installation", "Supply & Installation"]

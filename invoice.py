@@ -9,6 +9,10 @@ import os
 import requests
 from urllib.parse import unquote, quote
 import anthropic
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 
 st.set_page_config(page_title="MIRU Document Generator", layout="wide")
 
@@ -39,7 +43,7 @@ DOC_HEADERS = [
 ]
 TEMPLATE_HEADERS  = ["name", "terms_json"]
 MANAGER_HEADERS   = ["name", "whatsapp", "pin", "signature_b64"]
-CLIENT_HEADERS    = ["name", "billing_address", "delivery_address", "gst_number", "payment_terms", "notes"]
+CLIENT_HEADERS    = ["name", "billing_address", "delivery_address", "gst_number", "payment_terms", "notes", "email", "contact_name"]
 ITEM_HEADERS      = ["item_code", "description", "unit", "base_rate", "category", "sale_types", "supply_rate", "installation_rate"]
 SETTINGS_HEADERS  = ["key", "value"]
 
@@ -452,6 +456,44 @@ def update_wo_milestone(wo_id, milestone_idx, new_status):
             _bust()
             return
 
+def send_invoice_email(to_email, cc_emails, subject, body, pdf_bytes, pdf_filename):
+    """Send approved-invoice email with PDF attachment via SMTP.
+    SMTP creds read from st.secrets['smtp']: host, port, user, password, from_name (optional)."""
+    smtp_cfg = dict(st.secrets.get("smtp", {}))
+    if not smtp_cfg:
+        raise RuntimeError("SMTP not configured. Add [smtp] block to Streamlit secrets.")
+
+    host = smtp_cfg["host"]
+    port = int(smtp_cfg.get("port", 587))
+    user = smtp_cfg["user"]
+    password = smtp_cfg["password"]
+    from_name = smtp_cfg.get("from_name", "MIRU GRC")
+    from_addr = smtp_cfg.get("from_addr", user)
+
+    msg = MIMEMultipart()
+    msg["From"] = f"{from_name} <{from_addr}>"
+    msg["To"] = to_email
+    if cc_emails:
+        msg["Cc"] = ", ".join(cc_emails)
+    msg["Subject"] = subject
+
+    msg.attach(MIMEText(body, "plain"))
+
+    if pdf_bytes:
+        part = MIMEApplication(pdf_bytes, _subtype="pdf")
+        part.add_header("Content-Disposition", "attachment", filename=pdf_filename)
+        msg.attach(part)
+
+    recipients = [to_email] + list(cc_emails or [])
+    with smtplib.SMTP(host, port, timeout=30) as s:
+        s.ehlo()
+        s.starttls()
+        s.ehlo()
+        s.login(user, password)
+        s.sendmail(from_addr, recipients, msg.as_string())
+    return True
+
+
 def approve_doc(doc_id, manager_name, signature_b64):
     ws = get_sheet().worksheet("Documents")
     for i, r in enumerate(_fetch_documents()):
@@ -713,6 +755,23 @@ def approval_page(doc_id, token):
     mgr_name = st.selectbox("Your name", [m["name"] for m in managers])
     pin = st.text_input("Your PIN", type="password")
 
+    # Find client email from clients sheet
+    client_email_default = ""
+    try:
+        cli = next((c for c in get_clients() if c.get("name") == doc.get("client_name")), {})
+        client_email_default = str(cli.get("email", "") or "")
+    except Exception:
+        pass
+
+    em_col1, em_col2 = st.columns([2, 3])
+    send_email = em_col1.checkbox("📧 Email PDF to client on approval", value=bool(client_email_default))
+    client_email = em_col2.text_input("Client email", value=client_email_default,
+                                      placeholder="client@example.com",
+                                      disabled=not send_email)
+    cc_input = st.text_input("CC (comma-separated, optional)", value="",
+                             placeholder="finance@yourcompany.com, manager@…",
+                             disabled=not send_email)
+
     if st.button("✅ Approve Document", type="primary"):
         mgr = next((m for m in managers if m["name"] == mgr_name), None)
         if mgr and str(mgr["pin"]) == str(pin):
@@ -723,8 +782,26 @@ def approval_page(doc_id, token):
             doc["approved_by"] = mgr_name
             html = build_html(doc, sig_b64 or None)
             pdf = make_pdf(html)
-            st.download_button("📥 Download Approved PDF", pdf,
-                               file_name=f"{doc_id}_{doc['client_name'].replace(' ','_')}.pdf")
+            pdf_filename = f"{doc_id}_{doc['client_name'].replace(' ','_')}.pdf"
+            st.download_button("📥 Download Approved PDF", pdf, file_name=pdf_filename)
+
+            if send_email and client_email.strip():
+                cc_list = [e.strip() for e in cc_input.split(",") if e.strip()]
+                subject = f"{doc.get('doc_type','Document')} {doc.get('doc_code') or doc_id} — {doc.get('project_name','')}"
+                body = (
+                    f"Dear {doc.get('client_name','')},\n\n"
+                    f"Please find attached the approved {doc.get('doc_type','document')} "
+                    f"({doc.get('doc_code') or doc_id}) for {doc.get('project_name','')}.\n\n"
+                    f"Approved by: {mgr_name}\n"
+                    f"Date: {datetime.now().strftime('%d %b %Y')}\n\n"
+                    f"Regards,\nMIRU GRC"
+                )
+                try:
+                    with st.spinner("Sending email…"):
+                        send_invoice_email(client_email.strip(), cc_list, subject, body, pdf, pdf_filename)
+                    st.success(f"📧 Email sent to {client_email.strip()}" + (f" (cc: {', '.join(cc_list)})" if cc_list else ""))
+                except Exception as e:
+                    st.error(f"Email failed: {e}")
         else:
             st.error("Incorrect PIN.")
 
@@ -1318,12 +1395,43 @@ def documents_tab():
                             st.success(f"Viewing as {verified_mgr}")
                             d = get_document(doc["doc_id"])
                             st.components.v1.html(build_html(d, watermark=True), height=700, scrolling=True)
+                            # Email-on-approve options
+                            cli2 = next((c for c in get_clients() if c.get("name") == doc.get("client_name")), {})
+                            cli_email = str(cli2.get("email", "") or "")
+                            send_em = st.checkbox("📧 Email PDF to client on approval",
+                                                  value=bool(cli_email), key=f"sem_{doc['doc_id']}")
+                            email_to = st.text_input("Client email", value=cli_email,
+                                                     disabled=not send_em, key=f"emto_{doc['doc_id']}")
+                            email_cc = st.text_input("CC (comma-separated)", value="",
+                                                     disabled=not send_em, key=f"emcc_{doc['doc_id']}")
                             if st.button("✅ Approve Document", key=f"approve_{doc['doc_id']}", type="primary"):
                                 mgr2 = next((m for m in managers if m["name"] == verified_mgr), None)
                                 sig_b64 = str(mgr2.get("signature_b64", "")) if mgr2 else ""
                                 approve_doc(doc["doc_id"], verified_mgr, sig_b64)
                                 st.session_state.pop(pin_key, None)
                                 st.success("✅ Approved!")
+
+                                if send_em and email_to.strip():
+                                    try:
+                                        d2 = get_document(doc["doc_id"])
+                                        d2["approved_by"] = verified_mgr
+                                        pdf2 = make_pdf(build_html(d2, sig_b64 or None))
+                                        cc_list2 = [e.strip() for e in email_cc.split(",") if e.strip()]
+                                        subj = f"{doc.get('doc_type','Document')} {doc.get('doc_code') or doc['doc_id']} — {doc.get('project_name','')}"
+                                        body2 = (
+                                            f"Dear {doc.get('client_name','')},\n\n"
+                                            f"Please find attached the approved {doc.get('doc_type','document')} "
+                                            f"({doc.get('doc_code') or doc['doc_id']}) for {doc.get('project_name','')}.\n\n"
+                                            f"Approved by: {verified_mgr}\n"
+                                            f"Date: {datetime.now().strftime('%d %b %Y')}\n\n"
+                                            f"Regards,\nMIRU GRC"
+                                        )
+                                        with st.spinner("Sending email…"):
+                                            send_invoice_email(email_to.strip(), cc_list2, subj, body2,
+                                                               pdf2, f"{doc['doc_id']}_{doc.get('client_name','').replace(' ','_')}.pdf")
+                                        st.success(f"📧 Sent to {email_to.strip()}")
+                                    except Exception as e:
+                                        st.error(f"Email failed: {e}")
                                 st.rerun()
                             if st.button("✖ Cancel", key=f"cancel_{doc['doc_id']}"):
                                 st.session_state.pop(pin_key, None)
@@ -1565,6 +1673,9 @@ def clients_items_tab():
             edit_c = st.selectbox("Edit existing", ["— New Client —"] + [c["name"] for c in clients], key="edit_client_sel")
             ec = next((c for c in clients if c["name"] == edit_c), {}) if edit_c != "— New Client —" else {}
             cn = st.text_input("Client Name", value=ec.get("name", ""))
+            cce1, cce2 = st.columns(2)
+            ccontact = cce1.text_input("Contact Name", value=ec.get("contact_name", ""), placeholder="e.g. Mr. Sharma")
+            cemail = cce2.text_input("Email", value=ec.get("email", ""), placeholder="invoices@client.com")
             cb = st.text_area("Billing Address", value=ec.get("billing_address", ""), height=80)
             cd = st.text_area("Delivery Address", value=ec.get("delivery_address", ""), height=80)
             cg = st.text_input("GST Number", value=ec.get("gst_number", ""))
@@ -1573,7 +1684,8 @@ def clients_items_tab():
             if st.button("💾 Save Client"):
                 idx = next((i for i, c in enumerate(clients) if c["name"] == edit_c), None)
                 save_client({"name": cn, "billing_address": cb, "delivery_address": cd,
-                             "gst_number": cg, "payment_terms": cp, "notes": cno}, edit_idx=idx)
+                             "gst_number": cg, "payment_terms": cp, "notes": cno,
+                             "email": cemail, "contact_name": ccontact}, edit_idx=idx)
                 st.success(f"Client '{cn}' saved.")
                 st.rerun()
 
@@ -1581,6 +1693,10 @@ def clients_items_tab():
             st.markdown("---")
             for c in clients:
                 with st.expander(f"👤 {c['name']}"):
+                    if c.get("contact_name"):
+                        st.write(f"**Contact:** {c['contact_name']}")
+                    if c.get("email"):
+                        st.write(f"**Email:** {c['email']}")
                     st.write(f"**GST:** {c.get('gst_number','—')}")
                     st.write(f"**Payment Terms:** {c.get('payment_terms','—')}")
                     st.write(f"**Billing:** {c.get('billing_address','—')}")

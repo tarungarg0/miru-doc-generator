@@ -1005,7 +1005,7 @@ def doc_form(prefill=None):
     st_key  = doc_sale_type.replace(" ", "")       # "Supply" / "Installation" / "Supply&Installation"
     wk      = f"{wo_key}_{st_key}_{ms_sfx}"        # combined suffix used on every item widget
 
-    item_count = st.number_input("Number of items", 1, 20, value=max(1, len(existing)),
+    item_count = st.number_input("Number of items", 1, 200, value=max(1, len(existing)),
                                  step=1, key=f"ic_{uid}_{wk}")
     items = []
     hsn_options = ["68109990", "68109100", "69072100", "Other"]

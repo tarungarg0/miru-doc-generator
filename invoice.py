@@ -740,6 +740,7 @@ def doc_form(prefill=None):
     billing_q  = p.get("billing_address") or unquote(qp.get("billing", ""))
     delivery_q = p.get("delivery_address") or unquote(qp.get("address", ""))
     project_q  = p.get("project_name")    or unquote(qp.get("project", ""))
+    items_q    = unquote(qp.get("items",   ""))   # JSON-encoded items from dispatch dashboard
 
     # ── Type of Sale (document-level — drives milestone filter & rate logic) ──
     ALL_SALE_TYPES = ["Supply", "Installation", "Supply & Installation"]
@@ -949,6 +950,13 @@ def doc_form(prefill=None):
             existing.append(row)
         if caption_text:
             st.caption(caption_text)
+    elif items_q and not p.get("items"):
+        # Pre-fill from dispatch dashboard URL param (?items=JSON)
+        try:
+            existing = json.loads(items_q)
+        except Exception:
+            existing = []
+        ms_sfx = ""
     else:
         existing = p.get("items", [])
         ms_sfx   = ""

@@ -952,8 +952,31 @@ def doc_form(prefill=None):
             st.caption(caption_text)
     elif items_q and not p.get("items"):
         # Pre-fill from dispatch dashboard URL param (?items=JSON)
+        # Accepts compact array format [[desc, pieces, area_per_piece], ...]
+        # or full object format [{hsn, desc, qty, ...}, ...]
         try:
-            existing = json.loads(items_q)
+            raw = json.loads(items_q)
+            if raw and isinstance(raw[0], list):
+                existing = []
+                for row in raw:
+                    desc    = row[0] if len(row) > 0 else ""
+                    pieces  = float(row[1]) if len(row) > 1 else 0
+                    area_pc = float(row[2]) if len(row) > 2 else 0
+                    qty     = round(area_pc * pieces, 2) if area_pc > 0 else pieces
+                    existing.append({
+                        "hsn":            "68109990",
+                        "desc":           desc,
+                        "qty":            qty,
+                        "area_per_piece": area_pc,
+                        "pieces":         pieces,
+                        "unit":           "SQFT" if area_pc > 0 else "PC",
+                        "rate":           0,
+                        "supply_rate":    0,
+                        "install_rate":   0,
+                        "sale_type":      "Supply",
+                    })
+            else:
+                existing = raw
         except Exception:
             existing = []
         ms_sfx = ""

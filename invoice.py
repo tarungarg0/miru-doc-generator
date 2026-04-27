@@ -298,31 +298,31 @@ def save_document(data, edit_id=None):
 
 @st.cache_data(ttl=60)
 def _fetch_documents():
-    return get_sheet().worksheet("Documents").get_all_records(default_blank_value="")
+    return get_sheet().worksheet("Documents").get_all_records()
 
 @st.cache_data(ttl=60)
 def _fetch_templates():
-    return get_sheet().worksheet("Terms_Templates").get_all_records(default_blank_value="")
+    return get_sheet().worksheet("Terms_Templates").get_all_records()
 
 @st.cache_data(ttl=60)
 def _fetch_managers():
-    return get_sheet().worksheet("Managers").get_all_records(default_blank_value="")
+    return get_sheet().worksheet("Managers").get_all_records()
 
 @st.cache_data(ttl=60)
 def _fetch_clients():
-    return get_sheet().worksheet("Clients").get_all_records(default_blank_value="")
+    return get_sheet().worksheet("Clients").get_all_records()
 
 @st.cache_data(ttl=60)
 def _fetch_items():
-    return get_sheet().worksheet("Items").get_all_records(default_blank_value="")
+    return get_sheet().worksheet("Items").get_all_records()
 
 @st.cache_data(ttl=60)
 def _fetch_work_orders():
-    return get_sheet().worksheet("Work_Orders").get_all_records(default_blank_value="")
+    return get_sheet().worksheet("Work_Orders").get_all_records()
 
 @st.cache_data(ttl=300)
 def _fetch_settings():
-    rows = get_sheet().worksheet("Settings").get_all_records(default_blank_value="")
+    rows = get_sheet().worksheet("Settings").get_all_records()
     return {r["key"]: r["value"] for r in rows if r.get("key")}
 
 def get_settings():
@@ -330,7 +330,7 @@ def get_settings():
 
 def save_settings(kv_dict):
     ws   = get_sheet().worksheet("Settings")
-    rows = ws.get_all_records(default_blank_value="")
+    rows = ws.get_all_records()
     key_to_row = {r["key"]: i + 2 for i, r in enumerate(rows)}
     for k, v in kv_dict.items():
         if k in key_to_row:

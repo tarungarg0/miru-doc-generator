@@ -1851,29 +1851,123 @@ def documents_tab():
                         key=f"save_{doc['doc_id']}",
                     )
 
-                # ── Create Dispatch button → saves Draft to Dispatches sheet ──
+                # ── Create Dispatch button → shows inline form before saving ──
+                cd_open_key = f"cd_open_{doc['doc_id']}"
                 if challan_col.button("🚚 Create Dispatch", key=f"challan_{doc['doc_id']}", use_container_width=True):
-                    d = get_document(doc["doc_id"])
-                    dispatch_id = generate_dispatch_id()
-                    save_dispatch({
-                        "dispatch_id":      dispatch_id,
-                        "source_doc_id":    doc["doc_id"],
-                        "status":           "Draft",
-                        "client_name":      d.get("client_name",""),
-                        "project_name":     d.get("project_name",""),
-                        "billing_address":  d.get("billing_address",""),
-                        "delivery_address": d.get("delivery_address",""),
-                        "vehicle_no":       d.get("vehicle_no",""),
-                        "transporter_name": d.get("transporter_name",""),
-                        "transport_mode":   d.get("transport_mode","Road"),
-                        "purpose":          "Supply",
-                        "items":            d.get("items",[]),
-                        "created_at":       datetime.now().isoformat(),
-                        "finalized_at":     "",
-                    })
-                    st.success(f"✅ Dispatch **{dispatch_id}** created as Draft — go to **📦 Dispatches** tab to edit quantities & finalize.")
-                    st.session_state["nav"] = "📦 Dispatches"
+                    st.session_state[cd_open_key] = True
                     st.rerun()
+
+                if st.session_state.get(cd_open_key):
+                    d = get_document(doc["doc_id"])
+                    orig_items = d.get("items") or []
+
+                    st.markdown("---")
+                    st.markdown("#### 🚚 New Dispatch")
+
+                    # Header fields
+                    dh1, dh2, dh3, dh4 = st.columns(4)
+                    cd_vno  = dh1.text_input("Vehicle No.",
+                                             value=d.get("vehicle_no",""),
+                                             key=f"cd_vno_{doc['doc_id']}")
+                    cd_tsp  = dh2.text_input("Transporter",
+                                             value=d.get("transporter_name",""),
+                                             key=f"cd_tsp_{doc['doc_id']}")
+                    p_opts  = ["Supply","Job Work","Sales Return","Exhibition / Fairs","Others"]
+                    cd_purp = dh3.selectbox("Purpose", p_opts,
+                                            key=f"cd_purp_{doc['doc_id']}")
+                    m_opts  = ["Road","Rail","Air","Ship"]
+                    cd_mode = dh4.selectbox("Mode", m_opts,
+                                            key=f"cd_mode_{doc['doc_id']}")
+
+                    # Per-item qty
+                    st.markdown("**Dispatch Quantities**")
+                    cd_items = []
+                    pending_lines = []
+
+                    hc0,hc1,hc2,hc3,hc4,hc5 = st.columns([4,2,2,2,2,3])
+                    hc0.markdown("**Item**"); hc1.markdown("**Unit**")
+                    hc2.markdown("**Original Qty**"); hc3.markdown("**Dispatch Qty**")
+                    hc4.markdown("**Pending**"); hc5.markdown("**Remarks**")
+
+                    for i, it in enumerate(orig_items):
+                        orig_qty = float(it.get("qty", 0))
+                        unit     = it.get("unit", "SQFT")
+                        desc     = it.get("desc", f"Item {i+1}")
+                        ic0,ic1,ic2,ic3,ic4,ic5 = st.columns([4,2,2,2,2,3])
+                        ic0.write(desc); ic1.write(unit); ic2.write(format_inr(orig_qty))
+                        disp_qty = ic3.number_input(
+                            "", min_value=0.0, max_value=orig_qty,
+                            value=orig_qty, step=0.01,
+                            key=f"cd_qty_{doc['doc_id']}_{i}",
+                            label_visibility="collapsed")
+                        pending = round(orig_qty - disp_qty, 3)
+                        if pending > 0:
+                            ic4.markdown(f"⏳ **{format_inr(pending)}**")
+                            pending_lines.append(f"{desc}: {format_inr(pending)} {unit}")
+                        else:
+                            ic4.write("—")
+                        rmk = ic5.text_input("", key=f"cd_rmk_{doc['doc_id']}_{i}",
+                                             label_visibility="collapsed",
+                                             placeholder="Remarks")
+                        cd_items.append({
+                            "desc": desc, "hsn": it.get("hsn",""),
+                            "qty": disp_qty, "unit": unit,
+                            "area_per_piece": it.get("area_per_piece",0),
+                            "pieces": it.get("pieces",0),
+                            "remarks": rmk, "rate": 0,
+                        })
+
+                    if pending_lines:
+                        st.warning("⏳ **Pending:** " + " | ".join(pending_lines))
+
+                    # Preview
+                    if st.button("👁️ Preview Challan", key=f"cd_preview_{doc['doc_id']}"):
+                        preview_data = {
+                            "doc_id":           f"PREVIEW",
+                            "doc_type":         "Challan",
+                            "client_name":      d.get("client_name",""),
+                            "project_name":     d.get("project_name",""),
+                            "billing_address":  d.get("billing_address",""),
+                            "delivery_address": d.get("delivery_address",""),
+                            "doc_date":         str(date.today()),
+                            "vehicle_no":       cd_vno,
+                            "transporter_name": cd_tsp,
+                            "transport_mode":   cd_mode,
+                            "notes":            cd_purp,
+                            "items":            [it for it in cd_items if float(it["qty"]) > 0],
+                        }
+                        st.components.v1.html(build_html_challan(preview_data), height=700, scrolling=True)
+
+                    st.markdown("---")
+                    btn_save, btn_cancel = st.columns(2)
+                    if btn_save.button("💾 Save as Draft", type="primary",
+                                       key=f"cd_save_{doc['doc_id']}", use_container_width=True):
+                        dispatch_id = generate_dispatch_id()
+                        save_dispatch({
+                            "dispatch_id":      dispatch_id,
+                            "source_doc_id":    doc["doc_id"],
+                            "status":           "Draft",
+                            "client_name":      d.get("client_name",""),
+                            "project_name":     d.get("project_name",""),
+                            "billing_address":  d.get("billing_address",""),
+                            "delivery_address": d.get("delivery_address",""),
+                            "vehicle_no":       cd_vno,
+                            "transporter_name": cd_tsp,
+                            "transport_mode":   cd_mode,
+                            "purpose":          cd_purp,
+                            "items":            [it for it in cd_items if float(it["qty"]) > 0],
+                            "created_at":       datetime.now().isoformat(),
+                            "finalized_at":     "",
+                        })
+                        st.session_state.pop(cd_open_key, None)
+                        st.success(f"✅ Dispatch **{dispatch_id}** saved as Draft — go to **📦 Dispatches** tab to continue editing & finalize.")
+                        st.session_state["nav"] = "📦 Dispatches"
+                        st.rerun()
+
+                    if btn_cancel.button("✖ Cancel", key=f"cd_cancel_{doc['doc_id']}",
+                                         use_container_width=True):
+                        st.session_state.pop(cd_open_key, None)
+                        st.rerun()
 
 # ── Dispatches tab ─────────────────────────────────────────────────────────────
 

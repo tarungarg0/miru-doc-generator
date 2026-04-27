@@ -143,7 +143,7 @@ def ensure_sheets():
 
 def generate_doc_id(doc_type, code=""):
     records = _fetch_documents()
-    prefix = "QT" if doc_type == "Quotation" else "PI"
+    prefix = {"Quotation": "QT", "Proforma Invoice": "PI", "Tax Invoice": "TI", "Challan": "DC"}.get(doc_type, "DOC")
     year = datetime.now().strftime("%Y")
     code_part = f"-{code.strip().upper()}" if code.strip() else ""
     base = f"{prefix}-{year}{code_part}-"
@@ -711,9 +711,131 @@ th{{background:#f0f0f0;font-weight:bold;text-align:center;}}
 <div style='text-align:center;font-size:9pt;margin-top:6px;'>This is a Computer Generated Invoice</div>
 </div></body></html>"""
 
+def build_html_challan(data, signature_b64=None):
+    """Delivery Challan — dispatch details only, no rates or amounts."""
+    items = data.get("items") or json.loads(data.get("items_json", "[]"))
+
+    vehicle_no  = data.get("vehicle_no", "") or ""
+    transporter = data.get("transporter_name", "") or ""
+    transport_mode = data.get("transport_mode", "Road") or "Road"
+    purpose     = data.get("notes", "Supply") or "Supply"
+    delivery_addr = (data.get("delivery_address", "") or "").replace("\n", "<br>")
+    billing_addr  = (data.get("billing_address",  "") or "").replace("\n", "<br>")
+
+    # Try client GSTIN lookup
+    try:
+        client_data  = next((c for c in get_clients() if c["name"] == data.get("client_name", "")), {})
+        client_gstin = client_data.get("gst_number", "")
+    except Exception:
+        client_gstin = ""
+    client_code  = client_gstin[:2] if len(client_gstin) >= 2 else ""
+    client_state = STATE_NAMES.get(client_code, "")
+    gstin_line   = f"GSTIN/UIN: {client_gstin}<br>" if client_gstin else ""
+    state_line   = f"State Name: {client_state}, Code: {client_code}" if client_state else ""
+
+    # Item rows (no rates)
+    rows_html  = ""
+    total_qty  = {}   # unit → qty
+    for sl, it in enumerate(items, 1):
+        qty  = float(it.get("qty", 0))
+        unit = it.get("unit", "Sqft")
+        hsn  = it.get("hsn", "") or "68109990"
+        desc = it.get("desc", "")
+        app  = float(it.get("area_per_piece", 0))
+        pcs  = float(it.get("pieces", 0))
+        rmk  = it.get("remarks", "")
+        sub  = f"<br><small style='font-size:8.5pt;'>Area of One Piece: {app} {unit} × {int(pcs)} Pcs</small>" if app > 0 and pcs > 0 else ""
+        rows_html += f"<tr><td align='right'>{sl}</td><td><b>{desc}</b>{sub}</td><td align='center'>{hsn}</td><td align='right'>{format_inr(qty)}</td><td align='center'>{unit}</td><td>{rmk}</td></tr>"
+        total_qty[unit] = total_qty.get(unit, 0) + qty
+
+    total_str = " | ".join(f"{format_inr(v)} {u}" for u, v in total_qty.items())
+    sig_img   = f"<img src='data:image/png;base64,{signature_b64}' style='height:50px;display:block;margin:8px auto;'>" if signature_b64 else "<div style='height:60px;'></div>"
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset='UTF-8'>
+<style>
+@page {{margin:8mm 10mm;}}
+body{{font-family:Arial,sans-serif;font-size:10pt;color:#000;margin:0;}}
+.page{{border:1px solid #000;padding:6px;}}
+.title{{text-align:center;font-size:15pt;font-weight:bold;border-bottom:2px solid #000;padding-bottom:4px;}}
+table{{border-collapse:collapse;width:100%;}}
+td,th{{border:1px solid #000;padding:3px 5px;font-size:9.5pt;vertical-align:top;}}
+th{{background:#f0f0f0;font-weight:bold;text-align:center;}}
+.grid td{{border:none;border-bottom:1px solid #bbb;border-right:1px solid #bbb;padding:2px 4px;font-size:8.5pt;}}
+.grid td:last-child{{border-right:none;}}
+.grid tr:last-child td{{border-bottom:none;}}
+</style>
+</head><body><div class='page'>
+<div class='title'>Delivery Challan</div>
+
+<table>
+  <tr>
+    <td style='width:44%;'>
+      <b>MIRU GRC C/O MIXD STUDIO BY RMT</b><br>
+      E-1 (A) RIICO Industrial Area<br>Ranpur<br>325003<br>
+      GSTIN/UIN: 08ACDFM6440P1ZQ<br>
+      State Name: Rajasthan, Code: 08<br>
+      E-Mail: contact.mixdstudio@gmail.com
+    </td>
+    <td style='width:56%;padding:0;'>
+      <table class='grid'>
+        <tr><td style='width:36%'>Challan No.</td><td style='width:28%'><b>{data['doc_id']}</b></td><td style='width:18%'>Date</td><td><b>{data['doc_date']}</b></td></tr>
+        <tr><td>Purpose</td><td colspan='3'><b>{purpose}</b></td></tr>
+        <tr><td>Vehicle No.</td><td><b>{vehicle_no}</b></td><td>Mode</td><td>{transport_mode}</td></tr>
+        <tr><td>Transporter</td><td>{transporter}</td><td>Project</td><td>{data.get('project_name','')}</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td style='width:50%;'>
+      <b>Consignee (Ship to)</b><br>
+      {data['client_name']}<br>{delivery_addr}<br>
+      {gstin_line}{state_line}
+    </td>
+    <td style='width:50%;'>
+      <b>Buyer (Bill to)</b><br>
+      {data['client_name']}<br>{billing_addr}<br>
+      {gstin_line}{state_line}
+    </td>
+  </tr>
+</table>
+
+<table style='margin-top:0;'>
+  <thead>
+    <tr><th style='width:4%'>Sl No.</th><th style='width:42%'>Description of Goods</th><th style='width:10%'>HSN/SAC</th><th style='width:12%'>Quantity</th><th style='width:8%'>Unit</th><th style='width:24%'>Remarks</th></tr>
+  </thead>
+  <tbody>{rows_html}</tbody>
+  <tr><td colspan='3'><b>Total</b></td><td align='right'><b>{total_str}</b></td><td></td><td></td></tr>
+</table>
+
+<div style='font-size:9pt;padding:4px 0;font-style:italic;'>
+  This is a Delivery Challan only. No commercial value. Goods are being sent for {purpose.lower()}.
+</div>
+
+<table style='margin-top:8px;'>
+  <tr>
+    <td style='width:60%;'>
+      <b>Declaration</b><br><br>
+      We declare that this challan shows the actual description and quantity of goods dispatched and that all particulars are true and correct.
+    </td>
+    <td style='width:40%;text-align:center;'>
+      for MIRU GRC C/O MIXD STUDIO BY RMT<br>
+      {sig_img}
+      <b>Authorised Signatory</b>
+    </td>
+  </tr>
+</table>
+<div style='text-align:center;font-size:9pt;margin-top:6px;'>This is a Computer Generated Challan</div>
+</div></body></html>"""
+
 def build_html(data, signature_b64=None, watermark=False):
     if data.get("doc_type") == "Tax Invoice":
         return build_html_tax_invoice(data, signature_b64)
+    if data.get("doc_type") == "Challan":
+        return build_html_challan(data, signature_b64)
 
     logo_b64 = img_b64("MIRU GRC _INDIAS FASTEST GROWING BRAND_Black.png")
     logo_html = (f"<img src='data:image/png;base64,{logo_b64}' style='height:50px;'>"
@@ -1130,7 +1252,7 @@ def doc_form(prefill=None):
     # ── Doc type, date, transport ──
     col1, col2 = st.columns(2)
     with col1:
-        types    = ["Quotation", "Proforma Invoice", "Tax Invoice"]
+        types    = ["Quotation", "Proforma Invoice", "Tax Invoice", "Challan"]
         doc_type = st.selectbox("Document Type", types,
                                 index=types.index(p["doc_type"]) if p.get("doc_type") in types else 0)
         def _auto_code(wo):
@@ -1167,12 +1289,16 @@ def doc_form(prefill=None):
             transport_amount = st.number_input("Transport Amount (₹)", min_value=0.0,
                                                value=float(p.get("transport_amount", 0)))
 
-    # ── E-Way Bill fields (Tax Invoice only) ──
+    # ── Dispatch / E-Way Bill fields (Tax Invoice + Challan) ──
     vehicle_no = ""; transporter_name = ""; distance_km = ""; transport_mode = "Road"
-    if doc_type == "Tax Invoice":
+    challan_purpose = "Supply"
+    if doc_type in ("Tax Invoice", "Challan"):
         st.markdown("---")
-        st.subheader("🚛 E-Way Bill Details")
-        st.caption("Required for goods movement > ₹50,000. Will be used to auto-generate e-way bill on portal.")
+        if doc_type == "Tax Invoice":
+            st.subheader("🚛 E-Way Bill Details")
+            st.caption("Required for goods movement > ₹50,000. Will be used to auto-generate e-way bill on portal.")
+        else:
+            st.subheader("🚚 Dispatch Details")
         ew1, ew2, ew3, ew4 = st.columns(4)
         vehicle_no       = ew1.text_input("Vehicle No.", value=p.get("vehicle_no", ""),
                                           placeholder="e.g. DL01AB1234", key=f"vno_{uid}")
@@ -1185,6 +1311,12 @@ def doc_form(prefill=None):
         transport_mode   = ew4.selectbox("Mode of Transport", mode_opts,
                                          index=mode_opts.index(prev_mode) if prev_mode in mode_opts else 0,
                                          key=f"tmode_{uid}")
+        if doc_type == "Challan":
+            purpose_opts  = ["Supply", "Job Work", "Sales Return", "Exhibition / Fairs", "Others"]
+            prev_purpose  = p.get("notes", "Supply") if p.get("notes", "") in purpose_opts else "Supply"
+            challan_purpose = st.selectbox("Purpose of Challan", purpose_opts,
+                                           index=purpose_opts.index(prev_purpose),
+                                           key=f"cpurpose_{uid}")
 
     # ── Terms: auto-loaded from WO; shown read-only ──
     terms_key = f"active_terms_{uid}"
@@ -1446,7 +1578,14 @@ def doc_form(prefill=None):
                         qty = st.number_input("Total Qty (manual)", value=float(ei.get("qty", 0)),
                                               key=f"qty_{uid}_{wk}_{i}", min_value=0.0)
 
-                    if doc_sale_type == "Supply & Installation":
+                    if doc_type == "Challan":
+                        # No rates on challan — just show remarks field
+                        supply_rate  = None
+                        install_rate = None
+                        rate         = 0.0
+                        st.text_input("Remarks", value=ei.get("remarks", ""), key=f"rmk_{uid}_{wk}_{i}",
+                                      placeholder="e.g. For job work / sample")
+                    elif doc_sale_type == "Supply & Installation":
                         sr_default   = float(cat_item.get("supply_rate", cat_item.get("base_rate", 0))) if cat_item else float(ei.get("supply_rate", ei.get("rate", 0)))
                         ir_default   = float(cat_item.get("installation_rate", 0)) if cat_item else float(ei.get("install_rate", 0))
                         supply_rate  = st.number_input("Supply Rate (₹)", value=float(ei.get("supply_rate", sr_default)), key=f"sr_{uid}_{wk}_{i}", min_value=0.0)
@@ -1477,12 +1616,16 @@ def doc_form(prefill=None):
     subtotal = sum(float(it["qty"]) * float(it["rate"]) for it in items)
     grand    = round(subtotal * 1.18 + transport_amount)
     st.markdown("---")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Subtotal",       f"₹{format_inr(subtotal)}")
-    m2.metric("GST (18%)",      f"₹{format_inr(subtotal * 0.18)}")
-    m3.metric("Transport",      f"₹{format_inr(transport_amount)}" if transport == "Extra" else "Included")
-    m4.metric("Grand Total",    f"₹{format_inr(grand)}")
-    st.caption(f"Amount in Words: Rupees {amount_in_words(grand)}")
+    if doc_type == "Challan":
+        total_qty_ch = sum(float(it.get("qty", 0)) for it in items)
+        st.metric("Total Quantity", f"{format_inr(total_qty_ch)} units")
+    else:
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Subtotal",       f"₹{format_inr(subtotal)}")
+        m2.metric("GST (18%)",      f"₹{format_inr(subtotal * 0.18)}")
+        m3.metric("Transport",      f"₹{format_inr(transport_amount)}" if transport == "Extra" else "Included")
+        m4.metric("Grand Total",    f"₹{format_inr(grand)}")
+        st.caption(f"Amount in Words: Rupees {amount_in_words(grand)}")
 
     return {
         "doc_type":          doc_type,
@@ -1497,7 +1640,7 @@ def doc_form(prefill=None):
         "doc_code":          doc_code,
         "items":             items,
         "terms":             [t for t in terms if t.strip()],
-        "notes":             notes,
+        "notes":             challan_purpose if doc_type == "Challan" else notes,
         "wo_id":             wo_loaded["wo_id"] if wo_loaded else "",
         "wo_milestone_idx":  selected_milestone[0] if selected_milestone else None,
         "vehicle_no":        vehicle_no,
@@ -1516,7 +1659,7 @@ def documents_tab():
         return
 
     c1, c2 = st.columns(2)
-    ftype   = c1.selectbox("Type",   ["All", "Quotation", "Proforma Invoice", "Tax Invoice"])
+    ftype   = c1.selectbox("Type",   ["All", "Quotation", "Proforma Invoice", "Tax Invoice", "Challan"])
     fstatus = c2.selectbox("Status", ["All", "Draft", "Pending Approval", "Approved"])
 
     filtered = [

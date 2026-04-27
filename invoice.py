@@ -56,6 +56,18 @@ DEFAULT_BANK = {
     "account_type": "Current",
 }
 
+STATE_NAMES = {
+    "01":"Jammu & Kashmir","02":"Himachal Pradesh","03":"Punjab","04":"Chandigarh",
+    "05":"Uttarakhand","06":"Haryana","07":"Delhi","08":"Rajasthan",
+    "09":"Uttar Pradesh","10":"Bihar","11":"Sikkim","12":"Arunachal Pradesh",
+    "13":"Nagaland","14":"Manipur","15":"Mizoram","16":"Tripura",
+    "17":"Meghalaya","18":"Assam","19":"West Bengal","20":"Jharkhand",
+    "21":"Odisha","22":"Chhattisgarh","23":"Madhya Pradesh","24":"Gujarat",
+    "26":"Dadra & Nagar Haveli","27":"Maharashtra","28":"Andhra Pradesh",
+    "29":"Karnataka","30":"Goa","32":"Kerala","33":"Tamil Nadu",
+    "34":"Puducherry","36":"Telangana","37":"Andhra Pradesh (New)",
+}
+
 @st.cache_resource
 def ensure_sheets():
     sh = get_sheet()
@@ -518,7 +530,191 @@ def update_status(doc_id, status):
 
 # ── PDF builder ────────────────────────────────────────────────────────────────
 
+def build_html_tax_invoice(data, signature_b64=None):
+    """GST Tax Invoice — matches the standard Indian format."""
+    items = data.get("items") or json.loads(data.get("items_json", "[]"))
+
+    # Client GSTIN lookup
+    try:
+        client_data = next((c for c in get_clients() if c["name"] == data.get("client_name", "")), {})
+        client_gstin = client_data.get("gst_number", "")
+    except Exception:
+        client_gstin = ""
+
+    seller_code = "08"
+    client_code = client_gstin[:2] if len(client_gstin) >= 2 else ""
+    client_state = STATE_NAMES.get(client_code, "")
+    is_igst = client_code and client_code != seller_code
+
+    # Build item rows + compute totals in one pass
+    rows_html = ""
+    sl = 1
+    subtotal = 0.0
+    total_qty = 0.0
+    total_unit = "Sqft"
+    hsn_main = "68109990"
+
+    for it in items:
+        qty   = float(it.get("qty", 0))
+        total_qty += qty
+        total_unit = it.get("unit", "Sqft")
+        hsn   = it.get("hsn", "") or "68109990"
+        hsn_main = hsn
+        desc  = it.get("desc", "")
+        app   = float(it.get("area_per_piece", 0))
+        pcs   = float(it.get("pieces", 0))
+        stype = it.get("sale_type", "Supply")
+
+        sub = f"<br><small style='font-size:8.5pt;'>Area of One Piece {app} {total_unit} ({int(pcs)} Pcs)</small>" if app > 0 and pcs > 0 else ""
+
+        if stype == "Supply & Installation" and (it.get("supply_rate") or it.get("install_rate")):
+            sr = float(it.get("supply_rate") or 0)
+            ir = float(it.get("install_rate") or 0)
+            if sr:
+                subtotal += qty * sr
+                rows_html += f"<tr><td align='right'>{sl}</td><td><b>Supply of {desc}</b>{sub}</td><td align='center'>{hsn}</td><td align='right'>{format_inr(qty)} {total_unit}</td><td align='right'>{format_inr(sr)}</td><td align='center'>{total_unit}</td><td align='right'>{format_inr(qty*sr)}</td></tr>"
+                sl += 1
+            if ir:
+                subtotal += qty * ir
+                rows_html += f"<tr><td align='right'>{sl}</td><td><b>Installation of {desc}</b></td><td align='center'>{hsn}</td><td align='right'>{format_inr(qty)} {total_unit}</td><td align='right'>{format_inr(ir)}</td><td align='center'>{total_unit}</td><td align='right'>{format_inr(qty*ir)}</td></tr>"
+                sl += 1
+        else:
+            rate = float(it.get("rate", 0))
+            subtotal += qty * rate
+            rows_html += f"<tr><td align='right'>{sl}</td><td><b>{desc}</b>{sub}</td><td align='center'>{hsn}</td><td align='right'>{format_inr(qty)} {total_unit}</td><td align='right'>{format_inr(rate)}</td><td align='center'>{total_unit}</td><td align='right'>{format_inr(qty*rate)}</td></tr>"
+            sl += 1
+
+    transport_amount = float(data.get("transport_amount", 0) or 0)
+    tax_amount  = subtotal * 0.18
+    grand_pre   = subtotal + tax_amount + transport_amount
+    grand       = round(grand_pre)
+    round_off   = grand - grand_pre
+    round_str   = f"{round_off:+.2f}" if abs(round_off) > 0.001 else "0.00"
+
+    # Tax rows inside items table
+    if is_igst:
+        tax_rows_html = f"<tr><td colspan='5' style='font-style:italic'>Out Put IGST @ 18%</td><td align='center'>18 %</td><td align='right'>{format_inr(tax_amount)}</td></tr>"
+        tax_table_html = f"""<table style='margin-top:4px;'>
+          <thead><tr><th>HSN/SAC</th><th>Taxable Value</th><th>Rate</th><th>IGST Amount</th><th>Tax Amount</th></tr></thead>
+          <tbody>
+            <tr><td align='center'>{hsn_main}</td><td align='right'>₹{format_inr(subtotal)}</td><td align='center'>18%</td><td align='right'>₹{format_inr(tax_amount)}</td><td align='right'>₹{format_inr(tax_amount)}</td></tr>
+            <tr><td><b>Total</b></td><td align='right'><b>₹{format_inr(subtotal)}</b></td><td></td><td align='right'><b>₹{format_inr(tax_amount)}</b></td><td align='right'><b>₹{format_inr(tax_amount)}</b></td></tr>
+          </tbody></table>"""
+    else:
+        cgst = subtotal * 0.09
+        tax_rows_html = (f"<tr><td colspan='5' style='font-style:italic'>Out Put CGST @ 9%</td><td align='center'>9 %</td><td align='right'>{format_inr(cgst)}</td></tr>"
+                       + f"<tr><td colspan='5' style='font-style:italic'>Out Put SGST @ 9%</td><td align='center'>9 %</td><td align='right'>{format_inr(cgst)}</td></tr>")
+        tax_table_html = f"""<table style='margin-top:4px;'>
+          <thead><tr><th>HSN/SAC</th><th>Taxable Value</th><th>CGST 9%</th><th>CGST Amt</th><th>SGST 9%</th><th>SGST Amt</th><th>Tax Amount</th></tr></thead>
+          <tbody>
+            <tr><td align='center'>{hsn_main}</td><td align='right'>₹{format_inr(subtotal)}</td><td align='center'>9%</td><td align='right'>₹{format_inr(cgst)}</td><td align='center'>9%</td><td align='right'>₹{format_inr(cgst)}</td><td align='right'>₹{format_inr(tax_amount)}</td></tr>
+            <tr><td><b>Total</b></td><td align='right'><b>₹{format_inr(subtotal)}</b></td><td></td><td align='right'><b>₹{format_inr(cgst)}</b></td><td></td><td align='right'><b>₹{format_inr(cgst)}</b></td><td align='right'><b>₹{format_inr(tax_amount)}</b></td></tr>
+          </tbody></table>"""
+
+    sig_img = f"<img src='data:image/png;base64,{signature_b64}' style='height:50px;display:block;margin:8px auto;'>" if signature_b64 else "<div style='height:60px;'></div>"
+    vehicle_no  = data.get("vehicle_no", "") or ""
+    transporter = data.get("transporter_name", "") or ""
+    delivery_dest = (data.get("delivery_address", "") or "").split("\n")[0]
+    delivery_addr = (data.get("delivery_address", "") or "").replace("\n", "<br>")
+    billing_addr  = (data.get("billing_address",  "") or "").replace("\n", "<br>")
+    gstin_line = f"GSTIN/UIN: {client_gstin}<br>" if client_gstin else ""
+    state_line = f"State Name: {client_state}, Code: {client_code}" if client_state else ""
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset='UTF-8'>
+<style>
+@page {{margin:8mm 10mm;}}
+body{{font-family:Arial,sans-serif;font-size:10pt;color:#000;margin:0;}}
+.page{{border:1px solid #000;padding:6px;}}
+.title{{text-align:center;font-size:15pt;font-weight:bold;border-bottom:2px solid #000;padding-bottom:4px;margin-bottom:0;}}
+table{{border-collapse:collapse;width:100%;}}
+td,th{{border:1px solid #000;padding:3px 5px;font-size:9.5pt;vertical-align:top;}}
+th{{background:#f0f0f0;font-weight:bold;text-align:center;}}
+.grid td{{border:none;border-bottom:1px solid #bbb;border-right:1px solid #bbb;padding:2px 4px;font-size:8.5pt;}}
+.grid td:last-child{{border-right:none;}}
+.grid tr:last-child td{{border-bottom:none;}}
+</style>
+</head><body><div class='page'>
+<div class='title'>Tax Invoice</div>
+
+<table>
+  <tr>
+    <td style='width:44%;'>
+      <b>MIRU GRC C/O MIXD STUDIO BY RMT</b><br>
+      E-1 (A) RIICO Industrial Area<br>Ranpur<br>325003<br>
+      GSTIN/UIN: 08ACDFM6440P1ZQ<br>
+      State Name: Rajasthan, Code: 08<br>
+      E-Mail: contact.mixdstudio@gmail.com
+    </td>
+    <td style='width:56%;padding:0;'>
+      <table class='grid'>
+        <tr><td style='width:34%'>Invoice No.</td><td style='width:28%'><b>{data['doc_id']}</b></td><td style='width:18%'>Dated</td><td><b>{data['doc_date']}</b></td></tr>
+        <tr><td>Delivery Note</td><td></td><td>Mode/Terms of Payment</td><td></td></tr>
+        <tr><td>Reference No. &amp; Date</td><td>{data.get('project_name','')}</td><td>Other References</td><td></td></tr>
+        <tr><td>Buyer's Order No.</td><td></td><td>Dated</td><td></td></tr>
+        <tr><td>Dispatch Doc No.</td><td></td><td>Delivery Note Date</td><td></td></tr>
+        <tr><td>Dispatched through</td><td>{transporter}</td><td>Destination</td><td>{delivery_dest}</td></tr>
+        <tr><td>Bill of Lading/LR-RR No.</td><td></td><td>Motor Vehicle No.</td><td>{vehicle_no}</td></tr>
+        <tr><td>EWB No. dt. {data['doc_date']}</td><td></td><td>Terms of Delivery</td><td></td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td style='width:50%;'>
+      <b>Consignee (Ship to)</b><br>
+      {data['client_name']}<br>{delivery_addr}<br>
+      {gstin_line}{state_line}
+    </td>
+    <td style='width:50%;'>
+      <b>Buyer (Bill to)</b><br>
+      {data['client_name']}<br>{billing_addr}<br>
+      {gstin_line}{state_line}
+    </td>
+  </tr>
+</table>
+
+<table>
+  <thead>
+    <tr><th style='width:4%'>Sl No.</th><th style='width:38%'>Description of Goods</th><th style='width:10%'>HSN/SAC</th><th style='width:12%'>Quantity</th><th style='width:12%'>Rate</th><th style='width:6%'>per</th><th style='width:18%'>Amount</th></tr>
+  </thead>
+  <tbody>{rows_html}</tbody>
+  {tax_rows_html}
+  <tr><td colspan='6'><b>Round Off</b></td><td align='right'>{round_str}</td></tr>
+  <tr><td colspan='3'><b>Total</b></td><td align='right'><b>{format_inr(total_qty)} {total_unit}</b></td><td></td><td></td><td align='right'><b>₹ {format_inr(grand)}</b></td></tr>
+</table>
+
+<table>
+  <tr><td style='border-bottom:none;'><b>Amount Chargeable (in words)</b></td><td align='right' style='border-bottom:none;'>E. &amp; O.E</td></tr>
+  <tr><td colspan='2'><b>INR {amount_in_words(grand)}</b></td></tr>
+</table>
+
+{tax_table_html}
+<div style='padding:3px 0;font-size:9pt;'><b>Tax Amount (in words):</b> INR {amount_in_words(int(tax_amount))}</div>
+
+<table style='margin-top:8px;'>
+  <tr>
+    <td style='width:60%;'>
+      <b>Declaration</b><br><br>
+      We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.
+    </td>
+    <td style='width:40%;text-align:center;'>
+      for MIRU GRC C/O MIXD STUDIO BY RMT<br>
+      {sig_img}
+      <b>Authorised Signatory</b>
+    </td>
+  </tr>
+</table>
+
+<div style='text-align:center;font-size:9pt;margin-top:6px;'>This is a Computer Generated Invoice</div>
+</div></body></html>"""
+
 def build_html(data, signature_b64=None, watermark=False):
+    if data.get("doc_type") == "Tax Invoice":
+        return build_html_tax_invoice(data, signature_b64)
+
     logo_b64 = img_b64("MIRU GRC _INDIAS FASTEST GROWING BRAND_Black.png")
     logo_html = (f"<img src='data:image/png;base64,{logo_b64}' style='height:50px;'>"
                  if logo_b64 else "<strong>MIXD STUDIO BY RMT</strong>")

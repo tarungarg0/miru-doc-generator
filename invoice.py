@@ -2002,12 +2002,14 @@ def dispatches_tab():
             i3.write(f"**Vehicle:** {disp.get('vehicle_no','') or '—'}")
             i4.write(f"**Transporter:** {disp.get('transporter_name','') or '—'}")
 
-            # ── FINALIZED: just show re-download button ──────────────────────
+            # ── FINALIZED: re-download + re-open as Draft ────────────────────
             if disp.get("status") == "Finalized":
                 if disp.get("finalized_at"):
                     st.caption(f"Finalized: {str(disp['finalized_at'])[:16]}")
-                if st.button("📄 Re-download Challan PDF",
-                             key=f"redl_{disp['dispatch_id']}", type="primary"):
+
+                fa1, fa2 = st.columns(2)
+                if fa1.button("📄 Re-download Challan PDF",
+                              key=f"redl_{disp['dispatch_id']}", use_container_width=True):
                     challan_data = {
                         "doc_id":           disp["dispatch_id"],
                         "doc_type":         "Challan",
@@ -2028,6 +2030,16 @@ def dispatches_tab():
                         file_name=f"{disp['dispatch_id']}_{disp.get('client_name','').replace(' ','_')}.pdf",
                         key=f"save_redl_{disp['dispatch_id']}",
                     )
+
+                if fa2.button("✏️ Re-edit Dispatch",
+                              key=f"reopen_{disp['dispatch_id']}", use_container_width=True):
+                    updated = dict(disp)
+                    updated["status"]       = "Draft"
+                    updated["finalized_at"] = ""
+                    save_dispatch(updated, edit_id=disp["dispatch_id"])
+                    st.success("Reopened as Draft — you can now edit it below.")
+                    st.rerun()
+
                 continue  # skip edit form for finalized
 
             # ── DRAFT: full edit form ────────────────────────────────────────

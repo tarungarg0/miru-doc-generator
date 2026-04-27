@@ -298,31 +298,31 @@ def save_document(data, edit_id=None):
 
 @st.cache_data(ttl=60)
 def _fetch_documents():
-    return get_sheet().worksheet("Documents").get_all_records(expected_headers=DOC_HEADERS)
+    return get_sheet().worksheet("Documents").get_all_records(default_blank_value="")
 
 @st.cache_data(ttl=60)
 def _fetch_templates():
-    return get_sheet().worksheet("Terms_Templates").get_all_records(expected_headers=TEMPLATE_HEADERS)
+    return get_sheet().worksheet("Terms_Templates").get_all_records(default_blank_value="")
 
 @st.cache_data(ttl=60)
 def _fetch_managers():
-    return get_sheet().worksheet("Managers").get_all_records(expected_headers=MANAGER_HEADERS)
+    return get_sheet().worksheet("Managers").get_all_records(default_blank_value="")
 
 @st.cache_data(ttl=60)
 def _fetch_clients():
-    return get_sheet().worksheet("Clients").get_all_records(expected_headers=CLIENT_HEADERS)
+    return get_sheet().worksheet("Clients").get_all_records(default_blank_value="")
 
 @st.cache_data(ttl=60)
 def _fetch_items():
-    return get_sheet().worksheet("Items").get_all_records(expected_headers=ITEM_HEADERS)
+    return get_sheet().worksheet("Items").get_all_records(default_blank_value="")
 
 @st.cache_data(ttl=60)
 def _fetch_work_orders():
-    return get_sheet().worksheet("Work_Orders").get_all_records(expected_headers=WO_HEADERS)
+    return get_sheet().worksheet("Work_Orders").get_all_records(default_blank_value="")
 
 @st.cache_data(ttl=300)
 def _fetch_settings():
-    rows = get_sheet().worksheet("Settings").get_all_records(expected_headers=SETTINGS_HEADERS)
+    rows = get_sheet().worksheet("Settings").get_all_records(default_blank_value="")
     return {r["key"]: r["value"] for r in rows if r.get("key")}
 
 def get_settings():
@@ -330,7 +330,7 @@ def get_settings():
 
 def save_settings(kv_dict):
     ws   = get_sheet().worksheet("Settings")
-    rows = ws.get_all_records(expected_headers=SETTINGS_HEADERS)
+    rows = ws.get_all_records(default_blank_value="")
     key_to_row = {r["key"]: i + 2 for i, r in enumerate(rows)}
     for k, v in kv_dict.items():
         if k in key_to_row:

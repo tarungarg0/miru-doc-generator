@@ -41,6 +41,11 @@ DOC_HEADERS = [
     "approval_token", "approved_by", "approved_at", "signature_b64", "notes", "doc_code",
     "vehicle_no", "transporter_name", "distance_km", "transport_mode",
 ]
+DISPATCH_HEADERS  = [
+    "dispatch_id", "source_doc_id", "status", "client_name", "project_name",
+    "billing_address", "delivery_address", "vehicle_no", "transporter_name",
+    "transport_mode", "purpose", "items_json", "created_at", "finalized_at",
+]
 TEMPLATE_HEADERS  = ["name", "terms_json"]
 MANAGER_HEADERS   = ["name", "whatsapp", "pin", "signature_b64"]
 CLIENT_HEADERS    = ["name", "billing_address", "delivery_address", "gst_number", "payment_terms", "notes", "email", "contact_name"]
@@ -138,6 +143,15 @@ def ensure_sheets():
             ws.append_row([k, v])
     else:
         sh.worksheet("Settings").update("A1", [SETTINGS_HEADERS])
+
+    if "Dispatches" not in existing:
+        ws = sh.add_worksheet("Dispatches", 500, len(DISPATCH_HEADERS))
+        ws.update("A1", [DISPATCH_HEADERS])
+    else:
+        ws = sh.worksheet("Dispatches")
+        if ws.col_count < len(DISPATCH_HEADERS):
+            ws.resize(cols=len(DISPATCH_HEADERS))
+        ws.update("A1", [DISPATCH_HEADERS])
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -347,6 +361,84 @@ def _bust():
     _fetch_clients.clear()
     _fetch_items.clear()
     _fetch_work_orders.clear()
+    _fetch_dispatches.clear()
+
+# ── Dispatch CRUD ───────────────────────────────────────────────────────────────
+
+@st.cache_data(ttl=60)
+def _fetch_dispatches():
+    try:
+        return get_sheet().worksheet("Dispatches").get_all_records()
+    except Exception:
+        return []
+
+def generate_dispatch_id():
+    year  = datetime.now().strftime("%Y")
+    count = sum(1 for r in _fetch_dispatches()
+                if str(r.get("dispatch_id","")).startswith(f"DISP-{year}-")) + 1
+    return f"DISP-{year}-{count:03d}"
+
+def save_dispatch(data, edit_id=None):
+    sh = get_sheet()
+    ws = sh.worksheet("Dispatches")
+    records = _fetch_dispatches()
+    row = [
+        data["dispatch_id"],
+        data.get("source_doc_id", ""),
+        data.get("status", "Draft"),
+        data.get("client_name", ""),
+        data.get("project_name", ""),
+        data.get("billing_address", ""),
+        data.get("delivery_address", ""),
+        data.get("vehicle_no", ""),
+        data.get("transporter_name", ""),
+        data.get("transport_mode", "Road"),
+        data.get("purpose", "Supply"),
+        json.dumps(data.get("items", [])),
+        data.get("created_at", datetime.now().isoformat()),
+        data.get("finalized_at", ""),
+    ]
+    if edit_id:
+        for i, r in enumerate(records):
+            if r["dispatch_id"] == edit_id:
+                ws.update(f"A{i+2}:N{i+2}", [row])
+                _bust()
+                return data["dispatch_id"]
+    ws.append_row(row)
+    _bust()
+    return data["dispatch_id"]
+
+def get_dispatch(dispatch_id):
+    for r in _fetch_dispatches():
+        if r["dispatch_id"] == dispatch_id:
+            r = dict(r)
+            try:
+                r["items"] = json.loads(r["items_json"])
+            except Exception:
+                r["items"] = []
+            return r
+    return None
+
+def get_dispatches():
+    result = []
+    for r in _fetch_dispatches():
+        r = dict(r)
+        try:
+            r["items"] = json.loads(r["items_json"])
+        except Exception:
+            r["items"] = []
+        result.append(r)
+    return result
+
+def delete_dispatch(dispatch_id):
+    ws = get_sheet().worksheet("Dispatches")
+    records = _fetch_dispatches()
+    for i, r in enumerate(records):
+        if r["dispatch_id"] == dispatch_id:
+            ws.delete_rows(i + 2)
+            _bust()
+            return True
+    return False
 
 def get_document(doc_id):
     for r in _fetch_documents():
@@ -1759,106 +1851,274 @@ def documents_tab():
                         key=f"save_{doc['doc_id']}",
                     )
 
-                # ── Challan button → opens editable dispatch form ──
-                ch_open_key = f"ch_open_{doc['doc_id']}"
-                if challan_col.button("🚚 Generate Challan", key=f"challan_{doc['doc_id']}", use_container_width=True):
-                    st.session_state[ch_open_key] = True
+                # ── Create Dispatch button → saves Draft to Dispatches sheet ──
+                if challan_col.button("🚚 Create Dispatch", key=f"challan_{doc['doc_id']}", use_container_width=True):
+                    d = get_document(doc["doc_id"])
+                    dispatch_id = generate_dispatch_id()
+                    save_dispatch({
+                        "dispatch_id":      dispatch_id,
+                        "source_doc_id":    doc["doc_id"],
+                        "status":           "Draft",
+                        "client_name":      d.get("client_name",""),
+                        "project_name":     d.get("project_name",""),
+                        "billing_address":  d.get("billing_address",""),
+                        "delivery_address": d.get("delivery_address",""),
+                        "vehicle_no":       d.get("vehicle_no",""),
+                        "transporter_name": d.get("transporter_name",""),
+                        "transport_mode":   d.get("transport_mode","Road"),
+                        "purpose":          "Supply",
+                        "items":            d.get("items",[]),
+                        "created_at":       datetime.now().isoformat(),
+                        "finalized_at":     "",
+                    })
+                    st.success(f"✅ Dispatch **{dispatch_id}** created as Draft — go to **📦 Dispatches** tab to edit quantities & finalize.")
+                    st.session_state["nav"] = "📦 Dispatches"
                     st.rerun()
 
-                if st.session_state.get(ch_open_key):
-                    d = get_document(doc["doc_id"])
-                    orig_items = d.get("items") or []
+# ── Dispatches tab ─────────────────────────────────────────────────────────────
 
-                    st.markdown("---")
-                    st.markdown("#### 🚚 Edit Dispatch")
+def dispatches_tab():
+    st.subheader("📦 Dispatches")
+    st.caption("Create dispatches from approved documents (All Documents tab). Edit quantities over multiple days, then finalize to generate Challan PDF.")
 
-                    # Dispatch header fields
-                    dh1, dh2, dh3, dh4 = st.columns(4)
-                    ch_vno  = dh1.text_input("Vehicle No.",    value=d.get("vehicle_no",""),       key=f"ch_vno_{doc['doc_id']}")
-                    ch_tsp  = dh2.text_input("Transporter",    value=d.get("transporter_name",""), key=f"ch_tsp_{doc['doc_id']}")
-                    p_opts  = ["Supply","Job Work","Sales Return","Exhibition / Fairs","Others"]
-                    ch_purp = dh3.selectbox("Purpose", p_opts, key=f"ch_purp_{doc['doc_id']}")
-                    m_opts  = ["Road","Rail","Air","Ship"]
-                    ch_mode = dh4.selectbox("Mode", m_opts, key=f"ch_mode_{doc['doc_id']}")
+    dispatches = get_dispatches()
+    if not dispatches:
+        st.info("No dispatches yet. Open an **Approved** document in **📂 All Documents** and click **🚚 Create Dispatch**.")
+        return
 
-                    # Per-item dispatch qty
-                    st.markdown("**Dispatch Quantities** — reduce if partial dispatch; remainder stays in casting/processing")
-                    dispatch_items  = []
-                    pending_summary = []
+    fs = st.selectbox("Filter by Status", ["All", "Draft", "Finalized"], key="disp_filter")
+    filtered = [d for d in reversed(dispatches) if fs == "All" or d.get("status") == fs]
+    if not filtered:
+        st.info(f"No {fs} dispatches.")
+        return
 
-                    hc0,hc1,hc2,hc3,hc4,hc5 = st.columns([4,2,2,2,2,3])
-                    hc0.markdown("**Item**"); hc1.markdown("**Unit**")
-                    hc2.markdown("**Original Qty**"); hc3.markdown("**Dispatch Qty**")
-                    hc4.markdown("**Pending**"); hc5.markdown("**Remarks**")
+    icons = {"Draft": "🟡", "Finalized": "🟢"}
 
-                    for i, it in enumerate(orig_items):
-                        orig_qty = float(it.get("qty", 0))
-                        unit     = it.get("unit", "SQFT")
-                        desc     = it.get("desc", f"Item {i+1}")
-                        ic0,ic1,ic2,ic3,ic4,ic5 = st.columns([4,2,2,2,2,3])
-                        ic0.write(desc)
-                        ic1.write(unit)
-                        ic2.write(format_inr(orig_qty))
-                        disp_qty = ic3.number_input("", min_value=0.0, max_value=orig_qty,
-                                                    value=orig_qty, step=0.01,
-                                                    key=f"ch_qty_{doc['doc_id']}_{i}",
-                                                    label_visibility="collapsed")
-                        pending  = round(orig_qty - disp_qty, 3)
-                        if pending > 0:
-                            ic4.markdown(f"⏳ **{format_inr(pending)}**")
-                            pending_summary.append(f"{desc}: {format_inr(pending)} {unit}")
-                        else:
-                            ic4.write("—")
-                        rmk = ic5.text_input("", value="", key=f"ch_rmk_{doc['doc_id']}_{i}",
-                                             label_visibility="collapsed", placeholder="Remarks")
+    for disp in filtered:
+        icon  = icons.get(disp.get("status",""), "⚪")
+        label = (f"{icon} {disp['dispatch_id']}  |  "
+                 f"{disp.get('client_name','')}  |  "
+                 f"{disp.get('project_name','')}  |  "
+                 f"Source: {disp.get('source_doc_id','')}  |  "
+                 f"{'Finalized' if disp.get('status')=='Finalized' else 'Draft'}")
+        with st.expander(label, expanded=(disp.get("status")=="Draft")):
+            i1, i2, i3, i4 = st.columns(4)
+            i1.write(f"**Status:** {disp.get('status','')}")
+            i2.write(f"**Created:** {str(disp.get('created_at',''))[:10]}")
+            i3.write(f"**Vehicle:** {disp.get('vehicle_no','') or '—'}")
+            i4.write(f"**Transporter:** {disp.get('transporter_name','') or '—'}")
 
-                        dispatch_items.append({
-                            "desc": desc, "hsn": it.get("hsn",""), "qty": disp_qty,
-                            "unit": unit, "area_per_piece": it.get("area_per_piece",0),
-                            "pieces": it.get("pieces",0), "remarks": rmk, "rate": 0,
+            # ── FINALIZED: just show re-download button ──────────────────────
+            if disp.get("status") == "Finalized":
+                if disp.get("finalized_at"):
+                    st.caption(f"Finalized: {str(disp['finalized_at'])[:16]}")
+                if st.button("📄 Re-download Challan PDF",
+                             key=f"redl_{disp['dispatch_id']}", type="primary"):
+                    challan_data = {
+                        "doc_id":           disp["dispatch_id"],
+                        "doc_type":         "Challan",
+                        "client_name":      disp.get("client_name",""),
+                        "project_name":     disp.get("project_name",""),
+                        "billing_address":  disp.get("billing_address",""),
+                        "delivery_address": disp.get("delivery_address",""),
+                        "doc_date":         str(disp.get("finalized_at","") or disp.get("created_at",""))[:10],
+                        "vehicle_no":       disp.get("vehicle_no",""),
+                        "transporter_name": disp.get("transporter_name",""),
+                        "transport_mode":   disp.get("transport_mode","Road"),
+                        "notes":            disp.get("purpose","Supply"),
+                        "items":            disp.get("items",[]),
+                    }
+                    pdf = make_pdf(build_html_challan(challan_data))
+                    st.download_button(
+                        "⬇️ Save Challan PDF", pdf,
+                        file_name=f"{disp['dispatch_id']}_{disp.get('client_name','').replace(' ','_')}.pdf",
+                        key=f"save_redl_{disp['dispatch_id']}",
+                    )
+                continue  # skip edit form for finalized
+
+            # ── DRAFT: full edit form ────────────────────────────────────────
+            st.markdown("---")
+            st.markdown("##### ✏️ Edit Dispatch Details")
+
+            e1, e2, e3, e4 = st.columns(4)
+            e_vno  = e1.text_input("Vehicle No.",
+                                   value=disp.get("vehicle_no",""),
+                                   key=f"e_vno_{disp['dispatch_id']}")
+            e_tsp  = e2.text_input("Transporter",
+                                   value=disp.get("transporter_name",""),
+                                   key=f"e_tsp_{disp['dispatch_id']}")
+            p_opts = ["Supply","Job Work","Sales Return","Exhibition / Fairs","Others"]
+            p_idx  = p_opts.index(disp.get("purpose","Supply")) if disp.get("purpose","Supply") in p_opts else 0
+            e_purp = e3.selectbox("Purpose", p_opts, index=p_idx,
+                                  key=f"e_purp_{disp['dispatch_id']}")
+            m_opts = ["Road","Rail","Air","Ship"]
+            m_idx  = m_opts.index(disp.get("transport_mode","Road")) if disp.get("transport_mode","Road") in m_opts else 0
+            e_mode = e4.selectbox("Mode", m_opts, index=m_idx,
+                                  key=f"e_mode_{disp['dispatch_id']}")
+
+            # ── Items from source document ───────────────────────────────────
+            st.markdown("---")
+            st.markdown("**Dispatch Quantities** — adjust per item; partial dispatch shows pending remainder.")
+
+            src_doc   = get_document(disp.get("source_doc_id","")) if disp.get("source_doc_id") else None
+            src_items = src_doc.get("items",[]) if src_doc else []
+
+            # Current saved qtys / remarks keyed by description
+            curr_by_desc = {it["desc"]: it for it in disp.get("items",[])}
+
+            hc0,hc1,hc2,hc3,hc4,hc5 = st.columns([4,2,2,2,2,3])
+            hc0.markdown("**Item**"); hc1.markdown("**Unit**")
+            hc2.markdown("**Original Qty**"); hc3.markdown("**Dispatch Qty**")
+            hc4.markdown("**Pending**"); hc5.markdown("**Remarks**")
+
+            new_items      = []
+            pending_lines  = []
+
+            for i, it in enumerate(src_items):
+                orig_qty = float(it.get("qty", 0))
+                unit     = it.get("unit", "SQFT")
+                desc     = it.get("desc", f"Item {i+1}")
+                curr     = curr_by_desc.get(desc, {})
+                saved_q  = float(curr.get("qty", orig_qty))
+                saved_r  = curr.get("remarks","")
+
+                ic0,ic1,ic2,ic3,ic4,ic5 = st.columns([4,2,2,2,2,3])
+                ic0.write(desc)
+                ic1.write(unit)
+                ic2.write(format_inr(orig_qty))
+                disp_qty = ic3.number_input(
+                    "", min_value=0.0, max_value=orig_qty,
+                    value=min(saved_q, orig_qty), step=0.01,
+                    key=f"e_qty_{disp['dispatch_id']}_{i}",
+                    label_visibility="collapsed")
+                pending = round(orig_qty - disp_qty, 3)
+                if pending > 0:
+                    ic4.markdown(f"⏳ **{format_inr(pending)}**")
+                    pending_lines.append(f"{desc}: {format_inr(pending)} {unit}")
+                else:
+                    ic4.write("—")
+                rmk = ic5.text_input(
+                    "", value=saved_r,
+                    key=f"e_rmk_{disp['dispatch_id']}_{i}",
+                    label_visibility="collapsed", placeholder="Remarks")
+
+                new_items.append({
+                    "desc": desc, "hsn": it.get("hsn",""),
+                    "qty": disp_qty, "unit": unit,
+                    "area_per_piece": it.get("area_per_piece",0),
+                    "pieces": it.get("pieces",0),
+                    "remarks": rmk, "rate": 0,
+                })
+
+            # Also preserve any manually-added items already in dispatch that are
+            # NOT in the source document (custom items added previously)
+            src_descs = {it.get("desc","") for it in src_items}
+            for it in disp.get("items",[]):
+                if it.get("desc","") not in src_descs:
+                    new_items.append(it)
+
+            # ── Add custom item ──────────────────────────────────────────────
+            with st.expander("➕ Add Custom / Extra Item"):
+                ci1, ci2, ci3, ci4 = st.columns([4,2,2,3])
+                ci_desc = ci1.text_input("Description", key=f"ci_desc_{disp['dispatch_id']}")
+                ci_qty  = ci2.number_input("Qty", min_value=0.0, step=0.01,
+                                           key=f"ci_qty_{disp['dispatch_id']}")
+                ci_unit = ci3.selectbox("Unit", ["SQFT","RFT","NOS","KG","SET"],
+                                        key=f"ci_unit_{disp['dispatch_id']}")
+                ci_rmk  = ci4.text_input("Remarks", key=f"ci_rmk_{disp['dispatch_id']}")
+                if st.button("Add Item", key=f"ci_add_{disp['dispatch_id']}"):
+                    if ci_desc and ci_qty > 0:
+                        # Save dispatch immediately with the new item
+                        updated = dict(disp)
+                        updated["vehicle_no"]       = e_vno
+                        updated["transporter_name"] = e_tsp
+                        updated["purpose"]          = e_purp
+                        updated["transport_mode"]   = e_mode
+                        add_items = [it for it in new_items if float(it.get("qty",0)) > 0]
+                        add_items.append({
+                            "desc": ci_desc, "qty": ci_qty, "unit": ci_unit,
+                            "remarks": ci_rmk, "hsn":"","area_per_piece":0,
+                            "pieces":0,"rate":0,
                         })
-
-                    if pending_summary:
-                        st.warning("⏳ **Pending (Casting/Processing):**\n" + "\n".join(f"• {p}" for p in pending_summary))
-
-                    gen_col, cancel_col = st.columns(2)
-                    if gen_col.button("📄 Generate & Download Challan", type="primary", key=f"ch_gen_{doc['doc_id']}", use_container_width=True):
-                        challan_data = {
-                            "doc_id":           f"DC-{doc['doc_id']}",
-                            "doc_type":         "Challan",
-                            "client_name":      d.get("client_name",""),
-                            "project_name":     d.get("project_name",""),
-                            "billing_address":  d.get("billing_address",""),
-                            "delivery_address": d.get("delivery_address",""),
-                            "doc_date":         str(date.today()),
-                            "vehicle_no":       ch_vno,
-                            "transporter_name": ch_tsp,
-                            "transport_mode":   ch_mode,
-                            "notes":            ch_purp,
-                            "items":            [it for it in dispatch_items if float(it["qty"]) > 0],
-                        }
-                        challan_html = build_html_challan(challan_data)
-                        challan_pdf  = make_pdf(challan_html)
-                        st.download_button(
-                            "⬇️ Save Challan PDF", challan_pdf,
-                            file_name=f"DC-{doc['doc_id']}_{doc.get('client_name','').replace(' ','_')}.pdf",
-                            key=f"save_challan_{doc['doc_id']}",
-                        )
-                        # Update doc notes with pending info if any
-                        if pending_summary:
-                            existing_notes = doc.get("notes","") or ""
-                            pending_note = "PENDING: " + "; ".join(pending_summary)
-                            update_status(doc["doc_id"], "Approved")  # keep approved
-                            ws_d = get_sheet().worksheet("Documents")
-                            for ri, rd in enumerate(_fetch_documents()):
-                                if rd["doc_id"] == doc["doc_id"]:
-                                    ws_d.update(f"S{ri+2}", [[pending_note]])
-                                    _bust()
-                                    break
-
-                    if cancel_col.button("✖ Cancel", key=f"ch_cancel_{doc['doc_id']}", use_container_width=True):
-                        st.session_state.pop(ch_open_key, None)
+                        updated["items"] = add_items
+                        save_dispatch(updated, edit_id=disp["dispatch_id"])
+                        st.success(f"Added: {ci_desc}")
                         st.rerun()
+
+            if pending_lines:
+                st.warning("⏳ **Pending (still in casting/processing):**\n" +
+                           "\n".join(f"• {p}" for p in pending_lines))
+
+            # ── Action buttons ───────────────────────────────────────────────
+            st.markdown("---")
+            b1, b2, b3 = st.columns(3)
+
+            if b1.button("💾 Save Draft", key=f"save_d_{disp['dispatch_id']}", use_container_width=True):
+                updated = dict(disp)
+                updated["vehicle_no"]       = e_vno
+                updated["transporter_name"] = e_tsp
+                updated["purpose"]          = e_purp
+                updated["transport_mode"]   = e_mode
+                updated["items"]            = [it for it in new_items if float(it.get("qty",0)) > 0]
+                save_dispatch(updated, edit_id=disp["dispatch_id"])
+                st.success("✅ Draft saved — come back any time to continue editing.")
+                st.rerun()
+
+            if b2.button("✅ Finalize & Generate PDF",
+                         key=f"fin_d_{disp['dispatch_id']}", type="primary",
+                         use_container_width=True):
+                finalized_items = [it for it in new_items if float(it.get("qty",0)) > 0]
+                if not finalized_items:
+                    st.error("No items with qty > 0 to dispatch.")
+                else:
+                    updated = dict(disp)
+                    updated["vehicle_no"]       = e_vno
+                    updated["transporter_name"] = e_tsp
+                    updated["purpose"]          = e_purp
+                    updated["transport_mode"]   = e_mode
+                    updated["items"]            = finalized_items
+                    updated["status"]           = "Finalized"
+                    updated["finalized_at"]     = datetime.now().isoformat()
+                    save_dispatch(updated, edit_id=disp["dispatch_id"])
+
+                    challan_data = {
+                        "doc_id":           disp["dispatch_id"],
+                        "doc_type":         "Challan",
+                        "client_name":      disp.get("client_name",""),
+                        "project_name":     disp.get("project_name",""),
+                        "billing_address":  disp.get("billing_address",""),
+                        "delivery_address": disp.get("delivery_address",""),
+                        "doc_date":         str(date.today()),
+                        "vehicle_no":       e_vno,
+                        "transporter_name": e_tsp,
+                        "transport_mode":   e_mode,
+                        "notes":            e_purp,
+                        "items":            finalized_items,
+                    }
+                    pdf = make_pdf(build_html_challan(challan_data))
+                    st.download_button(
+                        "⬇️ Download Challan PDF", pdf,
+                        file_name=f"{disp['dispatch_id']}_{disp.get('client_name','').replace(' ','_')}.pdf",
+                        key=f"dl_fin_{disp['dispatch_id']}",
+                        type="primary",
+                    )
+                    st.success("✅ Finalized! Use the button above to download the Challan PDF.")
+
+            if b3.button("🗑️ Delete Draft",
+                         key=f"del_d_{disp['dispatch_id']}", use_container_width=True):
+                st.session_state[f"del_confirm_{disp['dispatch_id']}"] = True
+
+            if st.session_state.get(f"del_confirm_{disp['dispatch_id']}"):
+                st.warning(f"⚠️ Delete **{disp['dispatch_id']}** permanently?")
+                dc1, dc2 = st.columns(2)
+                if dc1.button("Yes, Delete", key=f"del_yes_{disp['dispatch_id']}", type="primary"):
+                    delete_dispatch(disp["dispatch_id"])
+                    st.session_state.pop(f"del_confirm_{disp['dispatch_id']}", None)
+                    st.success("Deleted.")
+                    st.rerun()
+                if dc2.button("Cancel", key=f"del_no_{disp['dispatch_id']}"):
+                    st.session_state.pop(f"del_confirm_{disp['dispatch_id']}", None)
+                    st.rerun()
 
 # ── Settings tab ───────────────────────────────────────────────────────────────
 
@@ -2239,7 +2499,7 @@ def main():
     if qp.get("edit"):
         st.session_state["nav"] = "📄 New Document"
 
-    nav = st.radio("", ["📄 New Document", "📂 All Documents", "📋 Work Orders", "🗂️ Clients & Items", "⚙️ Settings"],
+    nav = st.radio("", ["📄 New Document", "📂 All Documents", "📦 Dispatches", "📋 Work Orders", "🗂️ Clients & Items", "⚙️ Settings"],
                    horizontal=True, label_visibility="collapsed", key="nav")
 
     if nav == "📄 New Document":
@@ -2293,6 +2553,9 @@ def main():
 
     elif nav == "📂 All Documents":
         documents_tab()
+
+    elif nav == "📦 Dispatches":
+        dispatches_tab()
 
     elif nav == "📋 Work Orders":
         work_orders_tab()

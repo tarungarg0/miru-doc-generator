@@ -1759,44 +1759,106 @@ def documents_tab():
                         key=f"save_{doc['doc_id']}",
                     )
 
-                # ── Generate Challan from this document ──
+                # ── Challan button → opens editable dispatch form ──
+                ch_open_key = f"ch_open_{doc['doc_id']}"
                 if challan_col.button("🚚 Generate Challan", key=f"challan_{doc['doc_id']}", use_container_width=True):
+                    st.session_state[ch_open_key] = True
+                    st.rerun()
+
+                if st.session_state.get(ch_open_key):
                     d = get_document(doc["doc_id"])
-                    # Build a challan data dict from the document — strip rates, keep qty/desc
-                    challan_items = []
-                    for it in (d.get("items") or []):
-                        challan_items.append({
-                            "desc":           it.get("desc", ""),
-                            "hsn":            it.get("hsn", ""),
-                            "qty":            it.get("qty", 0),
-                            "unit":           it.get("unit", "SQFT"),
-                            "area_per_piece": it.get("area_per_piece", 0),
-                            "pieces":         it.get("pieces", 0),
-                            "remarks":        "",
-                            "sale_type":      it.get("sale_type", ""),
-                            "rate":           0,
+                    orig_items = d.get("items") or []
+
+                    st.markdown("---")
+                    st.markdown("#### 🚚 Edit Dispatch")
+
+                    # Dispatch header fields
+                    dh1, dh2, dh3, dh4 = st.columns(4)
+                    ch_vno  = dh1.text_input("Vehicle No.",    value=d.get("vehicle_no",""),       key=f"ch_vno_{doc['doc_id']}")
+                    ch_tsp  = dh2.text_input("Transporter",    value=d.get("transporter_name",""), key=f"ch_tsp_{doc['doc_id']}")
+                    p_opts  = ["Supply","Job Work","Sales Return","Exhibition / Fairs","Others"]
+                    ch_purp = dh3.selectbox("Purpose", p_opts, key=f"ch_purp_{doc['doc_id']}")
+                    m_opts  = ["Road","Rail","Air","Ship"]
+                    ch_mode = dh4.selectbox("Mode", m_opts, key=f"ch_mode_{doc['doc_id']}")
+
+                    # Per-item dispatch qty
+                    st.markdown("**Dispatch Quantities** — reduce if partial dispatch; remainder stays in casting/processing")
+                    dispatch_items  = []
+                    pending_summary = []
+
+                    hc0,hc1,hc2,hc3,hc4,hc5 = st.columns([4,2,2,2,2,3])
+                    hc0.markdown("**Item**"); hc1.markdown("**Unit**")
+                    hc2.markdown("**Original Qty**"); hc3.markdown("**Dispatch Qty**")
+                    hc4.markdown("**Pending**"); hc5.markdown("**Remarks**")
+
+                    for i, it in enumerate(orig_items):
+                        orig_qty = float(it.get("qty", 0))
+                        unit     = it.get("unit", "SQFT")
+                        desc     = it.get("desc", f"Item {i+1}")
+                        ic0,ic1,ic2,ic3,ic4,ic5 = st.columns([4,2,2,2,2,3])
+                        ic0.write(desc)
+                        ic1.write(unit)
+                        ic2.write(format_inr(orig_qty))
+                        disp_qty = ic3.number_input("", min_value=0.0, max_value=orig_qty,
+                                                    value=orig_qty, step=0.01,
+                                                    key=f"ch_qty_{doc['doc_id']}_{i}",
+                                                    label_visibility="collapsed")
+                        pending  = round(orig_qty - disp_qty, 3)
+                        if pending > 0:
+                            ic4.markdown(f"⏳ **{format_inr(pending)}**")
+                            pending_summary.append(f"{desc}: {format_inr(pending)} {unit}")
+                        else:
+                            ic4.write("—")
+                        rmk = ic5.text_input("", value="", key=f"ch_rmk_{doc['doc_id']}_{i}",
+                                             label_visibility="collapsed", placeholder="Remarks")
+
+                        dispatch_items.append({
+                            "desc": desc, "hsn": it.get("hsn",""), "qty": disp_qty,
+                            "unit": unit, "area_per_piece": it.get("area_per_piece",0),
+                            "pieces": it.get("pieces",0), "remarks": rmk, "rate": 0,
                         })
-                    challan_data = {
-                        "doc_id":           f"DC-{doc['doc_id']}",
-                        "doc_type":         "Challan",
-                        "client_name":      d.get("client_name", ""),
-                        "project_name":     d.get("project_name", ""),
-                        "billing_address":  d.get("billing_address", ""),
-                        "delivery_address": d.get("delivery_address", ""),
-                        "doc_date":         d.get("doc_date", str(date.today())),
-                        "vehicle_no":       d.get("vehicle_no", ""),
-                        "transporter_name": d.get("transporter_name", ""),
-                        "transport_mode":   d.get("transport_mode", "Road"),
-                        "notes":            "Supply",
-                        "items":            challan_items,
-                    }
-                    challan_html = build_html_challan(challan_data)
-                    challan_pdf  = make_pdf(challan_html)
-                    challan_col.download_button(
-                        "⬇️ Save Challan", challan_pdf,
-                        file_name=f"DC-{doc['doc_id']}_{doc.get('client_name','').replace(' ','_')}.pdf",
-                        key=f"save_challan_{doc['doc_id']}",
-                    )
+
+                    if pending_summary:
+                        st.warning("⏳ **Pending (Casting/Processing):**\n" + "\n".join(f"• {p}" for p in pending_summary))
+
+                    gen_col, cancel_col = st.columns(2)
+                    if gen_col.button("📄 Generate & Download Challan", type="primary", key=f"ch_gen_{doc['doc_id']}", use_container_width=True):
+                        challan_data = {
+                            "doc_id":           f"DC-{doc['doc_id']}",
+                            "doc_type":         "Challan",
+                            "client_name":      d.get("client_name",""),
+                            "project_name":     d.get("project_name",""),
+                            "billing_address":  d.get("billing_address",""),
+                            "delivery_address": d.get("delivery_address",""),
+                            "doc_date":         str(date.today()),
+                            "vehicle_no":       ch_vno,
+                            "transporter_name": ch_tsp,
+                            "transport_mode":   ch_mode,
+                            "notes":            ch_purp,
+                            "items":            [it for it in dispatch_items if float(it["qty"]) > 0],
+                        }
+                        challan_html = build_html_challan(challan_data)
+                        challan_pdf  = make_pdf(challan_html)
+                        st.download_button(
+                            "⬇️ Save Challan PDF", challan_pdf,
+                            file_name=f"DC-{doc['doc_id']}_{doc.get('client_name','').replace(' ','_')}.pdf",
+                            key=f"save_challan_{doc['doc_id']}",
+                        )
+                        # Update doc notes with pending info if any
+                        if pending_summary:
+                            existing_notes = doc.get("notes","") or ""
+                            pending_note = "PENDING: " + "; ".join(pending_summary)
+                            update_status(doc["doc_id"], "Approved")  # keep approved
+                            ws_d = get_sheet().worksheet("Documents")
+                            for ri, rd in enumerate(_fetch_documents()):
+                                if rd["doc_id"] == doc["doc_id"]:
+                                    ws_d.update(f"S{ri+2}", [[pending_note]])
+                                    _bust()
+                                    break
+
+                    if cancel_col.button("✖ Cancel", key=f"ch_cancel_{doc['doc_id']}", use_container_width=True):
+                        st.session_state.pop(ch_open_key, None)
+                        st.rerun()
 
 # ── Settings tab ───────────────────────────────────────────────────────────────
 

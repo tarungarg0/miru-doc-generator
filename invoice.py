@@ -1734,57 +1734,68 @@ def documents_tab():
                             st.success(f"Viewing as {verified_mgr}")
                             d = get_document(doc["doc_id"])
                             st.components.v1.html(build_html(d, watermark=True), height=700, scrolling=True)
-                            # Email-on-approve options
-                            cli2 = next((c for c in get_clients() if c.get("name") == doc.get("client_name")), {})
-                            cli_email = str(cli2.get("email", "") or "")
-                            send_em = st.checkbox("📧 Email PDF to client on approval",
-                                                  value=bool(cli_email), key=f"sem_{doc['doc_id']}")
-                            email_to = st.text_input("Client email", value=cli_email,
-                                                     disabled=not send_em, key=f"emto_{doc['doc_id']}")
-                            email_cc = st.text_input("CC (comma-separated)", value="",
-                                                     disabled=not send_em, key=f"emcc_{doc['doc_id']}")
                             if st.button("✅ Approve Document", key=f"approve_{doc['doc_id']}", type="primary"):
                                 mgr2 = next((m for m in managers if m["name"] == verified_mgr), None)
                                 sig_b64 = str(mgr2.get("signature_b64", "")) if mgr2 else ""
                                 approve_doc(doc["doc_id"], verified_mgr, sig_b64)
                                 st.session_state.pop(pin_key, None)
                                 st.success("✅ Approved!")
-
-                                if send_em and email_to.strip():
-                                    try:
-                                        d2 = get_document(doc["doc_id"])
-                                        d2["approved_by"] = verified_mgr
-                                        pdf2 = make_pdf(build_html(d2, sig_b64 or None))
-                                        cc_list2 = [e.strip() for e in email_cc.split(",") if e.strip()]
-                                        subj = f"{doc.get('doc_type','Document')} {doc.get('doc_code') or doc['doc_id']} — {doc.get('project_name','')}"
-                                        body2 = (
-                                            f"Dear {doc.get('client_name','')},\n\n"
-                                            f"Please find attached the approved {doc.get('doc_type','document')} "
-                                            f"({doc.get('doc_code') or doc['doc_id']}) for {doc.get('project_name','')}.\n\n"
-                                            f"Approved by: {verified_mgr}\n"
-                                            f"Date: {datetime.now().strftime('%d %b %Y')}\n\n"
-                                            f"Regards,\nMIRU GRC"
-                                        )
-                                        with st.spinner("Sending email…"):
-                                            send_invoice_email(email_to.strip(), cc_list2, subj, body2,
-                                                               pdf2, f"{doc['doc_id']}_{doc.get('client_name','').replace(' ','_')}.pdf")
-                                        st.success(f"📧 Sent to {email_to.strip()}")
-                                    except Exception as e:
-                                        st.error(f"Email failed: {e}")
                                 st.rerun()
                             if st.button("✖ Cancel", key=f"cancel_{doc['doc_id']}"):
                                 st.session_state.pop(pin_key, None)
                                 st.rerun()
 
             if doc["status"] == "Approved":
-                if act3.button("📥 Generate PDF", key=f"pdf_{doc['doc_id']}"):
-                    d = get_document(doc["doc_id"])
+                pdf_col, challan_col = st.columns(2)
+
+                # ── Generate document PDF ──
+                if pdf_col.button("📥 Generate PDF", key=f"pdf_{doc['doc_id']}", use_container_width=True):
+                    d    = get_document(doc["doc_id"])
                     html = build_html(d, d.get("signature_b64") or None)
                     pdf  = make_pdf(html)
-                    st.download_button(
+                    pdf_col.download_button(
                         "⬇️ Save PDF", pdf,
                         file_name=f"{doc['doc_id']}_{doc.get('client_name','').replace(' ','_')}.pdf",
                         key=f"save_{doc['doc_id']}",
+                    )
+
+                # ── Generate Challan from this document ──
+                if challan_col.button("🚚 Generate Challan", key=f"challan_{doc['doc_id']}", use_container_width=True):
+                    d = get_document(doc["doc_id"])
+                    # Build a challan data dict from the document — strip rates, keep qty/desc
+                    challan_items = []
+                    for it in (d.get("items") or []):
+                        challan_items.append({
+                            "desc":           it.get("desc", ""),
+                            "hsn":            it.get("hsn", ""),
+                            "qty":            it.get("qty", 0),
+                            "unit":           it.get("unit", "SQFT"),
+                            "area_per_piece": it.get("area_per_piece", 0),
+                            "pieces":         it.get("pieces", 0),
+                            "remarks":        "",
+                            "sale_type":      it.get("sale_type", ""),
+                            "rate":           0,
+                        })
+                    challan_data = {
+                        "doc_id":           f"DC-{doc['doc_id']}",
+                        "doc_type":         "Challan",
+                        "client_name":      d.get("client_name", ""),
+                        "project_name":     d.get("project_name", ""),
+                        "billing_address":  d.get("billing_address", ""),
+                        "delivery_address": d.get("delivery_address", ""),
+                        "doc_date":         d.get("doc_date", str(date.today())),
+                        "vehicle_no":       d.get("vehicle_no", ""),
+                        "transporter_name": d.get("transporter_name", ""),
+                        "transport_mode":   d.get("transport_mode", "Road"),
+                        "notes":            "Supply",
+                        "items":            challan_items,
+                    }
+                    challan_html = build_html_challan(challan_data)
+                    challan_pdf  = make_pdf(challan_html)
+                    challan_col.download_button(
+                        "⬇️ Save Challan", challan_pdf,
+                        file_name=f"DC-{doc['doc_id']}_{doc.get('client_name','').replace(' ','_')}.pdf",
+                        key=f"save_challan_{doc['doc_id']}",
                     )
 
 # ── Settings tab ───────────────────────────────────────────────────────────────

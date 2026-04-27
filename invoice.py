@@ -648,14 +648,13 @@ th{{background:#f0f0f0;font-weight:bold;text-align:center;}}
     </td>
     <td style='width:56%;padding:0;'>
       <table class='grid'>
-        <tr><td style='width:34%'>Invoice No.</td><td style='width:28%'><b>{data['doc_id']}</b></td><td style='width:18%'>Dated</td><td><b>{data['doc_date']}</b></td></tr>
+        <tr><td style='width:34%'>Dated</td><td style='width:28%'><b>{data['doc_date']}</b></td><td style='width:18%'>Reference</td><td>{data.get('project_name','')}</td></tr>
         <tr><td>Delivery Note</td><td></td><td>Mode/Terms of Payment</td><td></td></tr>
-        <tr><td>Reference No. &amp; Date</td><td>{data.get('project_name','')}</td><td>Other References</td><td></td></tr>
         <tr><td>Buyer's Order No.</td><td></td><td>Dated</td><td></td></tr>
         <tr><td>Dispatch Doc No.</td><td></td><td>Delivery Note Date</td><td></td></tr>
         <tr><td>Dispatched through</td><td>{transporter}</td><td>Destination</td><td>{delivery_dest}</td></tr>
-        <tr><td>Bill of Lading/LR-RR No.</td><td></td><td>Motor Vehicle No.</td><td>{vehicle_no}</td></tr>
-        <tr><td>EWB No. dt. {data['doc_date']}</td><td></td><td>Terms of Delivery</td><td></td></tr>
+        <tr><td>Motor Vehicle No.</td><td>{vehicle_no}</td><td>Terms of Delivery</td><td></td></tr>
+        <tr><td>EWB No. dt. {data['doc_date']}</td><td></td><td>Mode of Transport</td><td>{data.get('transport_mode','Road')}</td></tr>
       </table>
     </td>
   </tr>
